@@ -105,8 +105,8 @@ El Dockerfile compila con:
 
 - `GGML_CUDA=ON`
 - `CMAKE_CUDA_ARCHITECTURES=$SM_CUDA_ARCHITECTURES` (default `120`)
-- `GGML_CUDA_FA_ALL_QUANTS=ON`
-- `GGML_CUDA_FLASH_ATTN=ON`
+- `GGML_CUDA_FA=ON` + `GGML_CUDA_FA_ALL_QUANTS=ON` (flash attention kernels)
+- `CMAKE_EXE_LINKER_FLAGS` / `CMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda"` (resuelve la CUDA Driver API al linkear `libggml-cuda` como shared lib)
 - `CMAKE_BUILD_TYPE=Release`
 
 Verifica al arranque: `llama-server --version` debe mostrar compilación con CUDA + sm_120/Blackwell.

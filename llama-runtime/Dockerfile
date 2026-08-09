@@ -16,9 +16,13 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /src \
         -DGGML_CUDA=ON \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CUDA_ARCHITECTURES=120 \
+        -DGGML_CUDA_FA=ON \
         -DGGML_CUDA_FA_ALL_QUANTS=ON \
         -DLLAMA_CURL=ON \
-    && cmake --build /src/build --config Release --target llama-server -j 8 \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
+        -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
+    && cmake --build /src/build --config Release --target llama-server -j $(nproc) \
     && cmake --install /src/build --prefix /out
 
 # ---------- Etapa runtime ----------
