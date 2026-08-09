@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+
+# Builds
+engine-api/dist/
+engine-ui/dist/
+
+# Entorno local (nunca commitear secretos reales)
+.env
+.env.local
+.env.*.local
+
+# Modelos GGUF (grandes, se montan en runtime, no van al repo)
+models/
+*.gguf
+mmproj-*.gguf
+
+# Datos
+data/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tmp

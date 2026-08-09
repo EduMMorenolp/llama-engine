@@ -1,0 +1,71 @@
+name: "llama-engine"
+
+services:
+  llama-runtime:
+    build:
+      context: ./llama-runtime
+      dockerfile: Dockerfile
+    container_name: llama-runtime
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${LLAMA_GPU_DEVICE:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Flags de llama-server (se componen en el entrypoint)
+      - LLAMA_MODEL=${LLAMA_MODEL:-qwen3.5-4b}
+      - LLAMA_MMPROJ=${LLAMA_MMPROJ:-auto}
+      - LLAMA_NGPU=${LLAMA_NGPU:--1}
+      - LLAMA_CTX_SIZE=${LLAMA_CTX_SIZE:-32768}
+      - LLAMA_FLASH_ATTN=${LLAMA_FLASH_ATTN:-1}
+      - LLAMA_CHAT_TEMPLATE=${LLAMA_CHAT_TEMPLATE:-auto}
+    ports:
+      - "127.0.0.1:${LLAMA_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./models:/models:ro
+    networks:
+      - engine-network
+    restart: unless-stopped
+
+  engine-api:
+    build:
+      context: ./engine-api
+      dockerfile: Dockerfile
+    container_name: engine-api
+    environment:
+      - PORT=${ENGINE_API_PORT:-3050}
+      - API_KEY=${ENGINE_API_KEY:-llama-engine-dev}
+      - LLAMA_RUNTIME_URL=http://llama-runtime:8080
+      - LLAMA_RUNTIME_CONTAINER=llama-runtime
+      - MODELS_DIR=/models
+      - OLLAMA_GENERIC=false
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX=1000
+    volumes:
+      - ./models:/models:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${ENGINE_API_PORT:-3050}:3050"
+    networks:
+      - engine-network
+    depends_on:
+      - llama-runtime
+    restart: unless-stopped
+
+  engine-ui:
+    build:
+      context: ./engine-ui
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3050}
+        - VITE_API_KEY=${ENGINE_API_KEY:-llama-engine-dev}
+    container_name: engine-ui
+    ports:
+      - "${ENGINE_UI_PORT:-3051}:80"
+    networks:
+      - engine-network
+    depends_on:
+      - engine-api
+    restart: unless-stopped
+
+networks:
+  engine-network:
+    driver: bridge
