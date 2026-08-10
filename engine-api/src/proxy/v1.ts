@@ -41,12 +41,10 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 	const path = req.originalUrl; // ej: /v1/chat/completions
 	const target = new URL(`${config.runtimeUrl}${path}`);
 
-	const headers: Record<string, string | string[] | undefined> = {
-		"content-type": req.headers["content-type"] ?? "application/json",
-		accept: req.headers.accept ?? "application/json",
-		authorization: req.headers.authorization,
-		"x-api-key": req.headers["x-api-key"],
-	};
+	// No reenviar credenciales del cliente al upstream (el runtime no las necesita).
+	const headers: Record<string, string | string[] | undefined> = stripUpstreamCredentials(
+		req.headers,
+	);
 
 	const upstreamReq = http.request(target, { method: req.method, headers }, (upstreamRes) => {
 		res.statusCode = upstreamRes.statusCode ?? 502;
@@ -73,6 +71,20 @@ function writeUpstreamError(res: Response, err: unknown): void {
 		res.setHeader("content-type", "application/json");
 	}
 	res.end(JSON.stringify({ error: { message: `Runtime error: ${msg}`, type: "proxy_error" } }));
+}
+
+/**
+ * Copia de los headers del request dejando fuera las credenciales del cliente
+ * (authorization / x-api-key). El runtime llama-server no las necesita y reenviarlas
+ * fuga la API key del cliente hacia el upstream.
+ */
+export function stripUpstreamCredentials(
+	headers: Record<string, string | string[] | undefined>,
+): Record<string, string | string[] | undefined> {
+	return {
+		"content-type": headers["content-type"] ?? "application/json",
+		accept: headers.accept ?? "application/json",
+	};
 }
 
 export type { IncomingMessage };

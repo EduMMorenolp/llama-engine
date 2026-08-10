@@ -23,7 +23,7 @@ async function bootstrap() {
 	app.use(helmet());
 	app.use(
 		cors({
-			origin: () => true, // abierto para consumers locales/red
+			origin: true, // refleja el origin del cliente: abierto para consumers locales/red
 		}),
 	);
 	app.use(express.json({ limit: "50mb" }));
@@ -59,11 +59,11 @@ async function bootstrap() {
 		const modelId = String(req.body?.modelId ?? "");
 		const ctxSize = Number(req.body?.ctxSize ?? 0) || undefined;
 		if (!modelId) {
-			res.status(400).json({ error: "modelId es requerido" });
+			res.status(400).json({ error: { message: "modelId es requerido" } });
 			return;
 		}
 		if (!registry.get(modelId)) {
-			res.status(404).json({ error: `Modelo "${modelId}" no registrado` });
+			res.status(404).json({ error: { message: `Modelo "${modelId}" no registrado` } });
 			return;
 		}
 		const result = await runtime.reload(modelId, ctxSize ? { ctxSize } : {});
@@ -81,11 +81,11 @@ async function bootstrap() {
 
 	// ---- Not found + error ----
 	app.use((_req, res) => {
-		res.status(404).json({ error: "not_found" });
+		res.status(404).json({ error: { message: "not_found" } });
 	});
 	app.use((err: unknown, _req: Request, res: Response, _next: unknown) => {
-		const msg = err instanceof Error ? err.message : String(err);
-		res.status(500).json({ error: { message: msg } });
+		console.error("[engine-api] error:", err);
+		res.status(500).json({ error: { message: "Internal server error" } });
 	});
 
 	app.listen(config.port, () => {

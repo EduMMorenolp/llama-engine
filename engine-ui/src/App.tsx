@@ -50,7 +50,7 @@ function VramBar({ used, total }: { used: number; total: number }) {
 	return (
 		<div className="vram">
 			<div className="vram-bar">
-				<div className="vram-fill" style={{ width: `${pct}%` }} />
+				<div className="vram-fill" style={{ "--fill": `${Math.max(0, Math.min(100, pct)) / 100}` } as React.CSSProperties} />
 			</div>
 			<span className="vram-label">
 				{pct}% · {fmtBytes(used * 1024 * 1024)} / {fmtBytes(total * 1024 * 1024)}

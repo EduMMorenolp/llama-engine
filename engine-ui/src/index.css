@@ -132,7 +132,8 @@ body {
 	height: 100%;
 	background: linear-gradient(90deg, var(--accent), #22d3ee);
 	border-radius: 99px;
-	transition: width 0.4s ease;
+	transform-origin: left;
+	transition: transform 0.4s ease;
 }
 
 .vram-label {
