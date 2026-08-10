@@ -22,7 +22,7 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /src \
         -DLLAMA_BUILD_TESTS=OFF \
         -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
         -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
-    && cmake --build /src/build --config Release --target llama-server -j $(nproc) \
+    && cmake --build /src/build --config Release -j $(nproc) \
     && cmake --install /src/build --prefix /out
 
 # ---------- Etapa runtime ----------
@@ -33,7 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /models /workspace
 
-COPY --from=build /out/bin/llama-server /usr/local/bin/llama-server
+COPY --from=build /out/bin/ /usr/local/bin/
+COPY --from=build /out/lib/ /usr/local/lib/
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 WORKDIR /workspace
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
