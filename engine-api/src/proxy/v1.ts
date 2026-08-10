@@ -46,6 +46,16 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 		req.headers,
 	);
 
+	// express.json() ya consumió el stream del request, así que re-emitimos el body
+	// desde req.body con content-length explícito (el runtime no parsea chunked).
+	let payload: Buffer | null = null;
+	if (req.body != null) {
+		payload = Buffer.isBuffer(req.body)
+			? req.body
+			: Buffer.from(JSON.stringify(req.body), "utf8");
+		headers["content-length"] = String(payload.length);
+	}
+
 	const upstreamReq = http.request(target, { method: req.method, headers }, (upstreamRes) => {
 		res.statusCode = upstreamRes.statusCode ?? 502;
 		res.setHeader("content-type", upstreamRes.headers["content-type"] ?? "application/json");
@@ -61,7 +71,8 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 		res.end(JSON.stringify({ error: { message: "Runtime upstream error", type: "proxy_error" } }));
 	});
 
-	req.pipe(upstreamReq);
+	if (payload) upstreamReq.write(payload);
+	upstreamReq.end();
 }
 
 function writeUpstreamError(res: Response, err: unknown): void {
@@ -81,10 +92,16 @@ function writeUpstreamError(res: Response, err: unknown): void {
 export function stripUpstreamCredentials(
 	headers: Record<string, string | string[] | undefined>,
 ): Record<string, string | string[] | undefined> {
-	return {
+	const stripped: Record<string, string | string[] | undefined> = {
 		"content-type": headers["content-type"] ?? "application/json",
 		accept: headers.accept ?? "application/json",
 	};
+	// Preservar content-length: reenviamos el body tal cual via pipe, así el
+	// runtime recibe el body completo en lugar de chunked (llama-server no lo parsea).
+	if (headers["content-length"]) {
+		stripped["content-length"] = headers["content-length"];
+	}
+	return stripped;
 }
 
 export type { IncomingMessage };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { EngineStatus } from "./api";
 import { fetchStatus } from "./api";
+import InfoModal from "./InfoModal";
 
 const POLL_MS = 3000;
 
@@ -50,7 +51,10 @@ function VramBar({ used, total }: { used: number; total: number }) {
 	return (
 		<div className="vram">
 			<div className="vram-bar">
-				<div className="vram-fill" style={{ "--fill": `${Math.max(0, Math.min(100, pct)) / 100}` } as React.CSSProperties} />
+				<div
+					className="vram-fill"
+					style={{ "--fill": `${Math.max(0, Math.min(100, pct)) / 100}` } as React.CSSProperties}
+				/>
 			</div>
 			<span className="vram-label">
 				{pct}% · {fmtBytes(used * 1024 * 1024)} / {fmtBytes(total * 1024 * 1024)}
@@ -62,6 +66,7 @@ function VramBar({ used, total }: { used: number; total: number }) {
 function App() {
 	const [status, setStatus] = useState<EngineStatus | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [infoOpen, setInfoOpen] = useState(false);
 	const timer = useRef<number | null>(null);
 
 	useEffect(() => {
@@ -87,13 +92,24 @@ function App() {
 		<div className="app">
 			<header className="topbar">
 				<div className="brand">🦙 llama-engine</div>
-				<div className="status-pill">
-					<span className={`dot ${status?.runtimeRunning ? "ok" : "down"}`} />
-					{status?.runtimeHealthy
-						? "runtime ok"
-						: status?.runtimeRunning
-							? "cargando…"
-							: "runtime down"}
+				<div className="topbar-right">
+					<button
+						type="button"
+						className="icon-btn"
+						aria-label="Información del sistema"
+						title="Información, changelog y manual de uso"
+						onClick={() => setInfoOpen(true)}
+					>
+						i
+					</button>
+					<div className="status-pill">
+						<span className={`dot ${status?.runtimeRunning ? "ok" : "down"}`} />
+						{status?.runtimeHealthy
+							? "runtime ok"
+							: status?.runtimeRunning
+								? "cargando…"
+								: "runtime down"}
+					</div>
 				</div>
 			</header>
 
@@ -182,6 +198,8 @@ function App() {
 			<footer className="foot">
 				<span>motor llama.cpp · telemetría cada {POLL_MS / 1000}s</span>
 			</footer>
+
+			{infoOpen ? <InfoModal status={status} onClose={() => setInfoOpen(false)} /> : null}
 		</div>
 	);
 }

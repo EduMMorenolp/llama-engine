@@ -27,7 +27,7 @@ ARGS+=(--ctx-size "${LLAMA_CTX_SIZE:-32768}")
 ARGS+=(--n-gpu-layers "${LLAMA_NGPU:--1}")
 
 if [[ "${LLAMA_FLASH_ATTN:-1}" == "1" ]]; then
-  ARGS+=(--flash-attn)
+  ARGS+=(--flash-attn on)
 fi
 
 CHAT_TEMPLATE="${LLAMA_CHAT_TEMPLATE:-auto}"

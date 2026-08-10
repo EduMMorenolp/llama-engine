@@ -65,8 +65,21 @@ POST /api/models/reload {modelId, ctxSize?} → Dockerode recrea el contenedor
 | `runtime/manager.ts` | Dockerode: start/stop/reload/restart/exec del contenedor runtime. |
 | `models/registry.ts` | Scan de `MODELS_DIR` → registro de GGUFs (con detección de visión). |
 | `status/index.ts` | Telemetría agregada: GPU + slots + modelo + registro. |
-| `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con streaming al runtime. |
+| `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con re-emisión del body y streaming SSE. |
 | `middleware/auth.ts` | Auth por API key (`x-api-key` o `Bearer`). |
+
+## Proxy `/v1` — re-emisión del body
+
+`express.json()` (montado globalmente en `main.ts`) consume el stream del request entrante.
+El proxy no puede reenviar `req.pipe(upstreamReq)` porque el stream ya fue leído, y llama-server
+no acepta `Transfer-Encoding: chunked`. Solución en `proxy/v1.ts`:
+
+1. `stripUpstreamCredentials()` deja fuera `authorization`/`x-api-key` (no se filtran al upstream).
+2. El body se reconstruye desde `req.body` (`JSON.stringify` o buffer crudo) y se fija
+   `Content-Length`. Así el runtime recibe el JSON completo y responde streaming SSE.
+
+Requisito: el body debe llegar JSON-parsed (limit 50 MB). No aplica a streaming de subida multipart
+de archivos grandes al runtime.
 
 ## Seguridad
 

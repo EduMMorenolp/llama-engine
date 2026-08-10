@@ -46,6 +46,9 @@ curl -X POST http://localhost:3050/v1/chat/completions \
 
 Web de telemetría: http://localhost:3051
 
+La web incluye un botón **i** (información) con specs del sistema en vivo, changelog de versiones y
+manual de uso.
+
 ## Integración con opencode
 
 Este motor es compatible con opencode vía proveedor OpenAI-compatible. Ver [`docs/INTEGRACION-OPENCODE.md`](./docs/INTEGRACION-OPENCODE.md).

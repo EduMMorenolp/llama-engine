@@ -6,7 +6,20 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
-Seccion para cambios en desarrollo que no se publicaron aún.
+### Added
+- **engine-ui**: página de información del sistema (botón **i** en la topbar) con:
+  - Panel de specs en vivo: versión, uptime API, modelo cargado, modelos registrados, GPU y VRAM.
+  - Changelog de versiones (1/3 del ancho) + manual de uso (2/3). Modal accesible (Escape, ×, backdrop).
+  - Datos de contenido en `src/info.ts`; modal en `src/InfoModal.tsx`.
+
+### Fixed
+- **llama-runtime**: crash-loop por `--flash-attn` sin valor. La versión actual de llama-server exige
+  `--flash-attn on|off|auto`. `entrypoint.sh` ahora pasa `--flash-attn on`.
+- **llama-runtime**: `qwen3.5-4b.gguf` montado truncado (345 MB, incompleto). Re-descargado Q4_K_M
+  (2.7 GB) + `mmproj` (visión). Documentado en `docs/INSTALL.md` § modelos.
+- **engine-api**: proxy `/v1` devolvía 400/500 o se colgaba. `express.json()` consumía el stream del
+  request antes de reenviarlo; el proxy re-emite ahora el body desde `req.body` con `content-length`
+  explícito (llama-server no parsea `chunked`). Ver `docs/ARQUITECTURA.md` § proxy.
 
 ## [0.1.0] - 2026-08-09
 
