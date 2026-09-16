@@ -26,13 +26,16 @@ export async function runAgent(
 	onEvent?: (event: StreamEvent) => void,
 ): Promise<AgentResult> {
 	const { llmClient, toolRegistry, store, maxIterations, workDir } = config;
-	const { sessionId, message, model, systemPrompt } = options;
+	const { sessionId, message, model, systemPrompt, enabledTools } = options;
 
 	const userMsgId = randomUUID();
 	store.addMessage(userMsgId, sessionId, "user", message);
 
 	const memories = getMemoriesForContext(store);
-	const tools = toolRegistry.getSpecs();
+	let tools = toolRegistry.getSpecs();
+	if (enabledTools !== undefined) {
+		tools = tools.filter((t) => enabledTools.includes(t.function.name));
+	}
 	const toolContext: ToolContext = { sessionId, workDir, store };
 
 	const messages: LLMMessage[] = buildPrompt({
@@ -48,7 +51,8 @@ export async function runAgent(
 
 	for (let i = 0; i < maxIterations; i++) {
 		iterations++;
-		const response = await llmClient.sendMessage(messages, tools, model);
+		const toolsToPass = tools.length > 0 ? tools : undefined;
+		const response = await llmClient.sendMessage(messages, toolsToPass, model);
 
 		if (response.tool_calls && response.tool_calls.length > 0) {
 			const assistantMsgId = randomUUID();

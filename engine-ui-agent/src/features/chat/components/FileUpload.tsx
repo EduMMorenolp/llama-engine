@@ -7,6 +7,7 @@ export interface FileAttachment {
 	type: string;
 	size: number;
 	preview?: string;
+	content?: string;
 }
 
 interface FileUploadProps {
@@ -27,6 +28,7 @@ const ACCEPTED_TYPES = [
 	".js",
 	".ts",
 	".tsx",
+	".jsx",
 	".py",
 	".java",
 	".html",
@@ -92,8 +94,9 @@ export function useFileUpload() {
 	function readFile(file: File): Promise<FileAttachment> {
 		return new Promise((resolve) => {
 			const isImage = file.type.startsWith("image/");
+			const reader = new FileReader();
+
 			if (isImage) {
-				const reader = new FileReader();
 				reader.onload = () => {
 					resolve({
 						id: crypto.randomUUID?.() ?? Date.now().toString(),
@@ -105,12 +108,25 @@ export function useFileUpload() {
 				};
 				reader.readAsDataURL(file);
 			} else {
-				resolve({
-					id: crypto.randomUUID?.() ?? Date.now().toString(),
-					name: file.name,
-					type: file.type,
-					size: file.size,
-				});
+				reader.onload = () => {
+					const textContent = typeof reader.result === "string" ? reader.result : "";
+					resolve({
+						id: crypto.randomUUID?.() ?? Date.now().toString(),
+						name: file.name,
+						type: file.type,
+						size: file.size,
+						content: textContent,
+					});
+				};
+				reader.onerror = () => {
+					resolve({
+						id: crypto.randomUUID?.() ?? Date.now().toString(),
+						name: file.name,
+						type: file.type,
+						size: file.size,
+					});
+				};
+				reader.readAsText(file);
 			}
 		});
 	}

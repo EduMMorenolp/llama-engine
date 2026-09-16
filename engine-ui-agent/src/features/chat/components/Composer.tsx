@@ -3,6 +3,7 @@ import { fetchTools } from "../../../api.ts";
 import { PlusIcon, SendIcon, StopIcon, WrenchIcon } from "../../../components/ui/Icons.tsx";
 import { AttachMenu } from "./AttachMenu.tsx";
 import { type FileAttachment, FileUpload, useFileUpload } from "./FileUpload.tsx";
+import { MCPServersModal } from "./MCPServersModal.tsx";
 import { SystemPromptModal } from "./SystemPromptModal.tsx";
 import { type ToolConfig, ToolSelector } from "./ToolSelector.tsx";
 
@@ -10,7 +11,7 @@ interface ComposerProps {
 	onSend: (
 		text: string,
 		attachments: FileAttachment[],
-		options?: { systemPrompt?: string },
+		options?: { systemPrompt?: string; enabledTools?: string[] },
 	) => void;
 	onStop: () => void;
 	disabled: boolean;
@@ -40,6 +41,7 @@ export function Composer({
 	const [showAttachMenu, setShowAttachMenu] = useState(false);
 	const [showToolSelector, setShowToolSelector] = useState(false);
 	const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+	const [showMCPServers, setShowMCPServers] = useState(false);
 	const [systemPrompt, setSystemPrompt] = useState(
 		"Sos un asistente de IA experto en desarrollo de software y resolución de problemas.",
 	);
@@ -84,13 +86,14 @@ export function Composer({
 		const trimmed = text.trim();
 		if (!trimmed && attachments.length === 0) return;
 		if (disabled) return;
-		onSend(trimmed, attachments, { systemPrompt });
+		const enabledTools = tools.filter((t) => t.enabled).map((t) => t.name);
+		onSend(trimmed, attachments, { systemPrompt, enabledTools });
 		setText("");
 		setAttachments([]);
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 		}
-	}, [text, attachments, disabled, onSend, systemPrompt]);
+	}, [text, attachments, disabled, onSend, systemPrompt, tools]);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
@@ -125,9 +128,9 @@ export function Composer({
 		setShowSystemPrompt(true);
 	}, []);
 
-	const handleTools = useCallback(() => {
+	const handleMCPServers = useCallback(() => {
 		setShowAttachMenu(false);
-		setShowToolSelector(true);
+		setShowMCPServers(true);
 	}, []);
 
 	const activeToolsCount = tools.filter((t) => t.enabled).length;
@@ -143,6 +146,8 @@ export function Composer({
 					/>
 				)}
 
+				{showMCPServers && <MCPServersModal onClose={() => setShowMCPServers(false)} />}
+
 				{showToolSelector && (
 					<ToolSelector
 						tools={tools}
@@ -155,8 +160,7 @@ export function Composer({
 					<AttachMenu
 						onAddFiles={handleAddFiles}
 						onSystemMessage={handleSystemMessage}
-						onToggleTools={handleTools}
-						onMCPServers={() => setShowAttachMenu(false)}
+						onMCPServers={handleMCPServers}
 						onClose={() => setShowAttachMenu(false)}
 					/>
 				)}

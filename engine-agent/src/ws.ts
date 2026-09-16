@@ -19,7 +19,13 @@ export function createWebSocketServer(
 			try {
 				const msg = JSON.parse(data.toString());
 				if (msg.type === "chat") {
-					const { sessionId: inputSessionId, message, model, systemPrompt } = msg.payload ?? {};
+					const {
+						sessionId: inputSessionId,
+						message,
+						model,
+						systemPrompt,
+						enabledTools,
+					} = msg.payload ?? {};
 					const sessionId = inputSessionId ?? randomUUID();
 
 					if (!store.getSession(sessionId)) {
@@ -28,7 +34,7 @@ export function createWebSocketServer(
 
 					await runAgent(
 						{ ...agentConfig, store },
-						{ sessionId, message, model, systemPrompt },
+						{ sessionId, message, model, systemPrompt, enabledTools },
 						(event) => {
 							ws.send(JSON.stringify(event));
 						},

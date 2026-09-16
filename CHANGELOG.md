@@ -24,7 +24,20 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
-### Added
+- **engine-agent** (nuevo servicio de agente autónomo):
+  - Bucle de razonamiento interactivo y ejecución autónoma de herramientas (`src/agent/loop.ts`).
+  - Base de datos SQLite integrada con historial de sesiones y memorias persistentes (`src/sessions/`, `src/modules/memories/`).
+  - Registro de herramientas built-in (`bash`, `file-ops`, `search`, `memory`) con límites de salida y filtrado de directorios ignorados.
+  - Servidor WebSocket para streaming en tiempo real y API REST Express para gestión de sesiones, memorias y herramientas.
+  - Subcutánea integración con Servidores MCP (Model Context Protocol) mediante JSON-RPC sobre stdio y REST `/api/mcp/servers`.
+  - Normalización de baseURL `/v1` y manejo de presupuesto de contexto token limit.
+- **engine-ui-agent** (nueva interfaz moderna de Agent Studio):
+  - Diseño Obsidian Dark UI/UX inspirado en Claude, Gemini, ChatGPT y DeepSeek.
+  - Sidebar colapsable con sincronización reactiva de sesiones (`SessionsProvider`), búsqueda en historial y accesos directos.
+  - Menú desplegable interactivo para selección de modelos de IA con badges por proveedor.
+  - Extracción y adjunto de archivos de código y texto (`.md`, `.txt`, `.json`, etc.) directamente al prompt del agente.
+  - Modal de gestión de Servidores MCP para conectar, desconectar y registrar herramientas externas dinámicas.
+  - Acordeón de proceso de razonamiento / pensamiento y tarjetas de ejecución de herramientas con estados en tiempo real.
 - **engine-ui**: Wizard de personalización de modelos paso a paso (nueva ruta `/modelos/crear`):
   - Selector de flujo: Crear modelo, Mejorar modelo, Optimizar rendimiento.
   - Paso a paso guiado con stepper visual y navegación.

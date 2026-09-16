@@ -2,6 +2,9 @@ import { Router } from "express";
 import type { Database } from "sql.js";
 import type { AgentLoopConfig } from "../agent/loop.js";
 import { createChatRoutes } from "../modules/chat/routes.js";
+import { MCPController } from "../modules/mcp/controller.js";
+import { MCPManager } from "../modules/mcp/manager.js";
+import { createMCPRoutes } from "../modules/mcp/routes.js";
 import { MemoryController } from "../modules/memories/controller.js";
 import { createMemoryRoutes } from "../modules/memories/routes.js";
 import { MemoryService } from "../modules/memories/service.js";
@@ -33,6 +36,10 @@ export function createApiRoutes(
 	const toolService = new ToolService(toolRegistry);
 	const toolController = new ToolController(toolService);
 	router.use("/tools", createToolRoutes(toolController));
+
+	const mcpManager = new MCPManager(toolRegistry);
+	const mcpController = new MCPController(mcpManager);
+	router.use("/mcp", createMCPRoutes(mcpController));
 
 	router.use("/chat", createChatRoutes(agentConfig, store));
 

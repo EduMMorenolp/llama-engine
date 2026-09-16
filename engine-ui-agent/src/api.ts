@@ -61,3 +61,38 @@ export interface HealthStatus {
 export async function fetchHealth(): Promise<HealthStatus> {
 	return apiGet<HealthStatus>("/api/health");
 }
+
+export interface MCPServer {
+	id: string;
+	name: string;
+	transport: "stdio" | "sse" | "http";
+	command?: string;
+	args?: string[];
+	url?: string;
+	status: "connected" | "disconnected" | "error";
+	toolsCount?: number;
+	errorMessage?: string;
+}
+
+export async function fetchMCPServers(): Promise<MCPServer[]> {
+	const res = await apiGet<{ servers: MCPServer[] }>("/api/mcp/servers");
+	return res.servers;
+}
+
+export async function addMCPServer(server: Partial<MCPServer>): Promise<MCPServer> {
+	return apiPost<MCPServer>("/api/mcp/servers", server);
+}
+
+export async function deleteMCPServer(id: string): Promise<void> {
+	await apiDelete(`/api/mcp/servers/${id}`);
+}
+
+export async function connectMCPServer(
+	id: string,
+): Promise<{ success: boolean; tools: string[]; error?: string }> {
+	return apiPost(`/api/mcp/servers/${id}/connect`, {});
+}
+
+export async function disconnectMCPServer(id: string): Promise<{ success: boolean }> {
+	return apiPost(`/api/mcp/servers/${id}/disconnect`, {});
+}

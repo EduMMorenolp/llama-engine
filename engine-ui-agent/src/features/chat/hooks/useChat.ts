@@ -13,6 +13,7 @@ export interface ToolCallInfo {
 export interface SendMessageOptions {
 	model?: string;
 	systemPrompt?: string;
+	enabledTools?: string[];
 }
 
 interface UseChatReturn {
@@ -105,6 +106,7 @@ export function useChat(): UseChatReturn {
 							message,
 							model: options?.model,
 							systemPrompt: options?.systemPrompt,
+							enabledTools: options?.enabledTools,
 						},
 					}),
 				);

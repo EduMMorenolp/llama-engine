@@ -4,6 +4,7 @@ export interface AgentOptions {
 	model?: string;
 	workDir?: string;
 	systemPrompt?: string;
+	enabledTools?: string[];
 	maxIterations?: number;
 }
 

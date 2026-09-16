@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
+	CheckIcon,
 	ChevronDownIcon,
 	FileCodeIcon,
 	SearchIcon,
@@ -19,6 +20,39 @@ interface LayoutContextType {
 	sidebarOpen: boolean;
 	toggleSidebar: () => void;
 }
+
+const AVAILABLE_MODELS = [
+	{
+		id: "qwen3.5-agent",
+		name: "Qwen 2.5 Agent",
+		desc: "Optimizado para herramientas y código",
+		badge: "Default",
+	},
+	{
+		id: "llama3.3-70b",
+		name: "Llama 3.3 70B",
+		desc: "Razonamiento profundo y conocimiento general",
+		badge: "Meta",
+	},
+	{
+		id: "deepseek-r1",
+		name: "DeepSeek R1",
+		desc: "Pensamiento explícito y matemáticas/lógica",
+		badge: "Reasoning",
+	},
+	{
+		id: "claude-3.5",
+		name: "Claude 3.5 Sonnet",
+		desc: "Alta precisión en desarrollo y análisis",
+		badge: "Anthropic",
+	},
+	{
+		id: "gpt-4o",
+		name: "GPT-4o",
+		desc: "Modelo multimodal insignia",
+		badge: "OpenAI",
+	},
+];
 
 const STARTER_PROMPTS = [
 	{
@@ -51,6 +85,12 @@ const STARTER_PROMPTS = [
 	},
 ];
 
+function formatFileSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ChatView() {
 	const { addToast } = useToast();
 	const {
@@ -63,18 +103,27 @@ export function ChatView() {
 	const { streaming, currentContent, toolCalls, connectionState, sendMessage, stopStreaming } =
 		useChat();
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const modelMenuRef = useRef<HTMLDivElement>(null);
 	const { sidebarOpen, toggleSidebar } = useOutletContext<LayoutContextType>() ?? {
 		sidebarOpen: true,
 		toggleSidebar: () => {},
 	};
 
 	const [selectedModel, setSelectedModel] = useState("qwen3.5-agent");
+	const [showModelMenu, setShowModelMenu] = useState(false);
 
-	const cycleModel = () => {
-		const models = ["qwen3.5-agent", "llama3.3-70b", "deepseek-r1", "claude-3.5"];
-		const nextIdx = (models.indexOf(selectedModel) + 1) % models.length;
-		setSelectedModel(models[nextIdx]);
-	};
+	// Close model menu when clicking outside
+	useEffect(() => {
+		function handleClickOutside(e: MouseEvent) {
+			if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+				setShowModelMenu(false);
+			}
+		}
+		if (showModelMenu) {
+			document.addEventListener("mousedown", handleClickOutside);
+			return () => document.removeEventListener("mousedown", handleClickOutside);
+		}
+	}, [showModelMenu]);
 
 	const scrollToBottom = useCallback(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -88,8 +137,8 @@ export function ChatView() {
 
 	const handleSend = async (
 		text: string,
-		_attachments: FileAttachment[],
-		options?: { systemPrompt?: string },
+		attachments: FileAttachment[],
+		options?: { systemPrompt?: string; enabledTools?: string[] },
 	) => {
 		let sessionId = activeSessionId;
 		if (!sessionId) {
@@ -97,11 +146,28 @@ export function ChatView() {
 			sessionId = session.id;
 		}
 
+		// If there are attachments, build full message for the LLM
+		let fullMessage = text;
+		if (attachments && attachments.length > 0) {
+			const attachmentsSummary = attachments
+				.map((a) => {
+					if (a.content) {
+						return `[Archivo adjunto: ${a.name} (${formatFileSize(a.size)})]\n\`\`\`\n${a.content}\n\`\`\``;
+					}
+					return `[Archivo adjunto: ${a.name} (${formatFileSize(a.size)})]`;
+				})
+				.join("\n\n");
+
+			fullMessage = fullMessage ? `${fullMessage}\n\n${attachmentsSummary}` : attachmentsSummary;
+		}
+
+		// Display message in UI
+		const displayContent = text || attachments.map((a) => `📎 ${a.name}`).join(", ");
 		addMessage({
 			id: crypto.randomUUID?.() ?? Date.now().toString(),
 			sessionId,
 			role: "user",
-			content: text,
+			content: displayContent,
 			toolCalls: null,
 			toolCallId: null,
 			createdAt: Date.now(),
@@ -109,8 +175,12 @@ export function ChatView() {
 
 		sendMessage(
 			sessionId,
-			text,
-			{ model: selectedModel, systemPrompt: options?.systemPrompt },
+			fullMessage,
+			{
+				model: selectedModel,
+				systemPrompt: options?.systemPrompt,
+				enabledTools: options?.enabledTools,
+			},
 			(msg) => addMessage(msg),
 			() => {},
 			(err) => {
@@ -137,7 +207,7 @@ export function ChatView() {
 		<div className="main" style={{ width: "100%", height: "100%", position: "relative" }}>
 			{/* Chat Top Navbar */}
 			<header className="chat-navbar">
-				<div className="chat-navbar-left">
+				<div className="chat-navbar-left" ref={modelMenuRef} style={{ position: "relative" }}>
 					{!sidebarOpen && (
 						<button
 							type="button"
@@ -151,13 +221,52 @@ export function ChatView() {
 					<button
 						type="button"
 						className="model-badge-selector"
-						onClick={cycleModel}
-						title="Cambiar modelo de IA"
+						onClick={() => setShowModelMenu((prev) => !prev)}
+						title="Seleccionar modelo de IA"
 					>
 						<span className="model-dot" />
 						<span>{selectedModel}</span>
-						<ChevronDownIcon size={14} style={{ color: "var(--text-muted)" }} />
+						<ChevronDownIcon
+							size={14}
+							style={{
+								color: "var(--text-muted)",
+								transform: showModelMenu ? "rotate(180deg)" : "none",
+								transition: "transform 0.2s ease",
+							}}
+						/>
 					</button>
+
+					{showModelMenu && (
+						<div className="popover-menu model-dropdown-popover">
+							<div className="popover-header">
+								<span>Modelos Disponibles</span>
+							</div>
+							{AVAILABLE_MODELS.map((m) => (
+								<button
+									key={m.id}
+									type="button"
+									className={`popover-item ${m.id === selectedModel ? "active-model-item" : ""}`}
+									onClick={() => {
+										setSelectedModel(m.id);
+										setShowModelMenu(false);
+									}}
+								>
+									<div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+										<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+											<span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+												{m.name}
+											</span>
+											<span className="model-tag-badge">{m.badge}</span>
+										</div>
+										<span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{m.desc}</span>
+									</div>
+									{m.id === selectedModel && (
+										<CheckIcon size={15} style={{ color: "var(--accent)" }} />
+									)}
+								</button>
+							))}
+						</div>
+					)}
 				</div>
 
 				<div className="chat-navbar-right">
