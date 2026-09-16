@@ -4,13 +4,46 @@ Todas las entradas notables del proyecto.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y el proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-10
+
+### Added
+- **engine-ui**: UI completa con sidebar y 5 pantallas enrutadas (react-router): Dashboard, Modelos, Runtime, Telemetría y Ayuda.
+  - Selector de modelo GGUF con contexto (ctx) y recarga; tabla de detalle por modelo (visión/tamaño/estado).
+  - Controles de runtime (Reiniciar/Stop/Start) con estados busy e inline feedback en Modelos y Runtime.
+  - Vista de logs del runtime con tail configurable y actualización manual.
+  - Gráfico tok/s con Chart.js (serie acumulada de hasta 60 muestras del poll) y panel GPU en Telemetría.
+  - Tokens CSS semánticos, escala de spacing de 4px, tipografía delimitada; acceso por teclado, `aria-current`, estados loading/empty/error por pantalla.
+  - Página de información del sistema: specs en vivo, changelog y manual (contenido de `info.ts`).
+- **engine-api**: endpoints de gestión del runtime (auth):
+  - `RuntimeManager`: `stop()`, `start()`, `logs(tail)` (demultiplexado Docker, clamp 1..500) y `getEnv()`.
+  - `GET /api/runtime/health` → `{ running, healthy, loadedModel, ctxSize }`.
+  - `GET /api/runtime/config` → engine + `runtimeEnv` (solo `LLAMA_*`; nunca `apiKey` ni vars con KEY/PASS/SECRET).
+  - `GET /api/runtime/logs?tail=N` → `{ lines }` (N default 100, clamp 1..500).
+  - `POST /api/runtime/stop` y `POST /api/runtime/start`.
+  - `StatusService`: `isHealthy()` y `ctxSize()` públicos. Demux de logs cubierto por tests unitarios.
+
 ## [Unreleased]
 
 ### Added
-- **engine-ui**: página de información del sistema (botón **i** en la topbar) con:
-  - Panel de specs en vivo: versión, uptime API, modelo cargado, modelos registrados, GPU y VRAM.
-  - Changelog de versiones (1/3 del ancho) + manual de uso (2/3). Modal accesible (Escape, ×, backdrop).
-  - Datos de contenido en `src/info.ts`; modal en `src/InfoModal.tsx`.
+- **engine-ui**: Wizard de personalización de modelos paso a paso (nueva ruta `/modelos/crear`):
+  - Selector de flujo: Crear modelo, Mejorar modelo, Optimizar rendimiento.
+  - Paso a paso guiado con stepper visual y navegación.
+  - Selección de modelo base (HuggingFace o locales).
+  - Upload y validación de datasets JSONL (ShareGPT, OpenAI, Alpaca).
+  - Configuración de entrenamiento (QLoRA, LoRA, Full FT) con parámetros ajustables.
+  - Monitoreo de entrenamiento con loss curves y logs en tiempo real.
+  - Quantización interactiva (Q3_K_M a Q8_0) con estimación de tamaño.
+  - Deploy one-click a /models con activación automática.
+- **llama-trainer** (nuevo servicio Docker):
+  - API Flask para gestión de datasets, entrenamiento, conversión HF→GGUF y quantización.
+  - Integración con LLaMA-Factory para fine-tuning.
+  - Herramientas de llama.cpp (llama-quantize, llama-imatrix, convert_hf_to_gguf.py).
+  - Endpoints: `/api/datasets`, `/api/train`, `/api/quantize`, `/api/models/deploy`.
+- **engine-api**: Nuevos endpoints proxy al trainer:
+  - `GET /api/datasets`, `DELETE /api/datasets/:id`, `GET /api/datasets/:id/validate`
+  - `POST /api/train/start`, `GET /api/train/jobs`, `GET /api/train/jobs/:jobId`
+  - `POST /api/quantize`, `GET /api/quantize/methods`
+  - `POST /api/models/deploy`
 
 ### Fixed
 - **llama-runtime**: crash-loop por `--flash-attn` sin valor. La versión actual de llama-server exige

@@ -37,10 +37,14 @@ services:
       - LLAMA_RUNTIME_CONTAINER=llama-runtime
       - MODELS_DIR=/models
       - OLLAMA_GENERIC=false
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-false}
       - RATE_LIMIT_WINDOW_MS=900000
-      - RATE_LIMIT_MAX=1000
+      - RATE_LIMIT_MAX=10000
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HF_HUB_URL=${HF_HUB_URL:-https://huggingface.co}
+      - TRAINER_URL=http://llama-trainer:8081
     volumes:
-      - ./models:/models:ro
+      - ./models:/models:rw
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "${ENGINE_API_PORT:-3050}:3050"
@@ -48,6 +52,7 @@ services:
       - engine-network
     depends_on:
       - llama-runtime
+      - llama-trainer
     restart: unless-stopped
 
   engine-ui:
@@ -64,6 +69,29 @@ services:
       - engine-network
     depends_on:
       - engine-api
+    restart: unless-stopped
+
+  llama-trainer:
+    build:
+      context: ./llama-trainer
+      dockerfile: Dockerfile
+    container_name: llama-trainer
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${LLAMA_GPU_DEVICE:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - TRAINER_PORT=${TRAINER_PORT:-8081}
+      - DATA_DIR=/data
+      - MODELS_DIR=/models
+    volumes:
+      - ./data/datasets:/data/datasets
+      - ./data/base:/data/base
+      - ./data/output:/data/output
+      - ./models:/models:rw
+    ports:
+      - "127.0.0.1:${TRAINER_PORT:-8081}:8081"
+    networks:
+      - engine-network
     restart: unless-stopped
 
 networks:

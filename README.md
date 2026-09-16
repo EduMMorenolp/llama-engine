@@ -58,7 +58,7 @@ Este motor es compatible con opencode vía proveedor OpenAI-compatible. Ver [`do
 ```
 llama-engine/
 ├── docker-compose.yml
-├── llama-runtime/          # Dockerfile tu build CUDA/Blackwell + entrypoint
+├── llama-runtime/          # Dockerfile tu build CUDA/Blackwell + entrypoint + GUIA-USO.md
 ├── engine-api/             # wrapper API (src/{main,config,env,runtime,models,proxy,status,middleware})
 ├── engine-ui/              # SPA de telemetría
 ├── models/                 # GGUFs montados (gitignored)

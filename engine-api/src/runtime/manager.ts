@@ -76,6 +76,72 @@ export class RuntimeManager {
 		}
 	}
 
+	/** Detiene el contenedor runtime. Ya detenido => ok (no es error). */
+	async stop(): Promise<{ ok: boolean; message: string }> {
+		try {
+			await this.docker.getContainer(this.config.runtimeContainer).stop();
+			return { ok: true, message: "Runtime detenido." };
+		} catch (err) {
+			// status 304 = "already stopped" (docker no-modificado)
+			if ((err as { statusCode?: number })?.statusCode === 304) {
+				return { ok: true, message: "Runtime ya estaba detenido." };
+			}
+			const msg = err instanceof Error ? err.message : String(err);
+			return { ok: false, message: msg };
+		}
+	}
+
+	/** Inicia el contenedor runtime. Si ya corre => error. */
+	async start(): Promise<{ ok: boolean; message: string }> {
+		try {
+			const container = this.docker.getContainer(this.config.runtimeContainer);
+			const info = await container.inspect();
+			if (info.State?.Running) {
+				return { ok: false, message: "Runtime ya está corriendo." };
+			}
+			await container.start();
+			return { ok: true, message: "Runtime iniciado." };
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			return { ok: false, message: msg };
+		}
+	}
+
+	/**
+	 * Últimas líneas de logs del contenedor (stdout+stderr), demultiplexadas
+	 * del protocolo Docker (8 bytes de cabecera por frame; bytes 4..7 = tamaño).
+	 * `tail` se limita a 1..500.
+	 */
+	async logs(tail: number): Promise<string> {
+		const n = Math.max(1, Math.min(500, Number.isFinite(tail) ? Math.floor(tail) : 100));
+		try {
+			const container = this.docker.getContainer(this.config.runtimeContainer);
+			// Sin follow, dockerode devuelve un Buffer multiplexado ya completo.
+			const buf = await container.logs({ stdout: true, stderr: true, tail: n });
+			return demultiplexLogs([buf]);
+		} catch {
+			return "";
+		}
+	}
+
+	/** Variables de entorno del contenedor como objeto clave-valor. `{}` si falla. */
+	async getEnv(): Promise<Record<string, string>> {
+		try {
+			const info = await this.getContainer();
+			const env = info.Config?.Env;
+			if (!Array.isArray(env)) return {};
+			const out: Record<string, string> = {};
+			for (const kv of env) {
+				const idx = kv.indexOf("=");
+				if (idx <= 0) continue;
+				out[kv.slice(0, idx)] = kv.slice(idx + 1);
+			}
+			return out;
+		} catch {
+			return {};
+		}
+	}
+
 	/**
 	 * Ejecuta un comando dentro del contenedor runtime vía dockerode (usa docker.sock).
 	 * Útil para telemetría GPU (nvidia-smi vive en el runtime, que sí tiene drivers).
@@ -128,3 +194,23 @@ function hostExec(cmd: string, timeoutMs: number): Promise<string> {
 }
 
 export type { RegisteredModel }; // re-export para conveniencia
+
+/**
+ * Demultiplexa el buffer de logs de Docker (modo multiplexado).
+ * Cada frame: byte 0 = stream type (1=stdout, 2=stderr), bytes 1..3 padding,
+ * bytes 4..7 = largo (big-endian), luego el payload. Se ignoran los tipos y
+ * se concatenan los payloads.
+ */
+export function demultiplexLogs(chunks: Buffer[]): string {
+	const data = Buffer.concat(chunks);
+	let out = "";
+	let offset = 0;
+	while (offset + 8 <= data.length) {
+		const frameLen = data.readUInt32BE(offset + 4);
+		const end = offset + 8 + frameLen;
+		if (end > data.length) break;
+		out += data.subarray(offset + 8, end).toString("utf8");
+		offset = end;
+	}
+	return out;
+}

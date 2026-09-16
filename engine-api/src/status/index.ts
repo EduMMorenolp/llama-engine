@@ -105,10 +105,34 @@ export class StatusService {
 				signal: AbortSignal.timeout(3000),
 			});
 			if (!res.ok) return undefined;
-			const json = (await res.json()) as { default_generation_settings?: { model?: string } };
-			const modelPath = json?.default_generation_settings?.model;
+			const json = (await res.json()) as {
+				model_alias?: string;
+				model_path?: string;
+				default_generation_settings?: { model?: string };
+			};
+			const modelPath =
+				json.model_alias || json.model_path || json.default_generation_settings?.model;
 			if (!modelPath) return undefined;
 			return (modelPath.split(/[\\/]/).pop() || modelPath).replace(/\.gguf$/, "");
+		} catch {
+			return undefined;
+		}
+	}
+
+	/** true si llama-server responde /health. */
+	async isHealthy(): Promise<boolean> {
+		return (await this.fetchRuntime("/health")) !== null;
+	}
+
+	/** n_ctx activo del runtime (default_generation_settings), si responde /props. */
+	async ctxSize(): Promise<number | undefined> {
+		try {
+			const res = await fetch(`${this.config.runtimeUrl}/props`, {
+				signal: AbortSignal.timeout(3000),
+			});
+			if (!res.ok) return undefined;
+			const json = (await res.json()) as { default_generation_settings?: { n_ctx?: number } };
+			return json?.default_generation_settings?.n_ctx;
 		} catch {
 			return undefined;
 		}

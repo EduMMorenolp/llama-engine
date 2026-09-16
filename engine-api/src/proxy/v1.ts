@@ -3,29 +3,28 @@ import http from "node:http";
 import type { Request, Response } from "express";
 import { Router } from "express";
 import type { AppConfig } from "../config.js";
+import type { ModelRegistry } from "../models/registry.js";
 
 /**
  * Proxy transparente hacia la API OpenAI-compatible de llama-server.
  * Reenvía /v1/* (chat/completions, embeddings, models) al runtime con streaming SSE.
+ * /v1/models se maneja localmente devolviendo todos los modelos del registro.
  */
-export function createV1Proxy(config: AppConfig): Router {
+export function createV1Proxy(config: AppConfig, registry: ModelRegistry): Router {
 	const router = Router();
 
-	// GET /v1/models — lista de modelos del runtime
-	router.get("/v1/models", async (_req, res) => {
-		try {
-			const up = await fetch(`${config.runtimeUrl}/v1/models`, {
-				signal: AbortSignal.timeout(5000),
-			});
-			if (!up.ok) {
-				res.status(502).json({ error: { message: `upstream ${up.status}` } });
-				return;
-			}
-			res.setHeader("content-type", "application/json");
-			res.send(await up.text());
-		} catch (err) {
-			writeUpstreamError(res, err);
-		}
+	// GET /v1/models — todos los modelos del registro en formato OpenAI
+	router.get("/v1/models", (_req, res) => {
+		const models = registry.list();
+		res.json({
+			object: "list",
+			data: models.map((m) => ({
+				id: m.id,
+				object: "model" as const,
+				created: Math.floor(Date.now() / 1000),
+				owned_by: "llama-engine",
+			})),
+		});
 	});
 
 	// Proxy del resto de /v1/*
@@ -50,9 +49,7 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 	// desde req.body con content-length explícito (el runtime no parsea chunked).
 	let payload: Buffer | null = null;
 	if (req.body != null) {
-		payload = Buffer.isBuffer(req.body)
-			? req.body
-			: Buffer.from(JSON.stringify(req.body), "utf8");
+		payload = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body), "utf8");
 		headers["content-length"] = String(payload.length);
 	}
 

@@ -6,7 +6,10 @@ export interface AppConfig {
 	runtimeUrl: string;
 	runtimeContainer: string;
 	modelsDir: string;
-	rateLimit: { windowMs: number; max: number };
+	rateLimit: { enabled: boolean; windowMs: number; max: number };
+	hubUrl: string;
+	hubToken: string;
+	trainerUrl: string;
 }
 
 export function buildConfig(env: Env): AppConfig {
@@ -17,8 +20,12 @@ export function buildConfig(env: Env): AppConfig {
 		runtimeContainer: env.LLAMA_RUNTIME_CONTAINER,
 		modelsDir: env.MODELS_DIR,
 		rateLimit: {
+			enabled: env.RATE_LIMIT_ENABLED,
 			windowMs: env.RATE_LIMIT_WINDOW_MS,
 			max: env.RATE_LIMIT_MAX,
 		},
+		hubUrl: env.HF_HUB_URL,
+		hubToken: env.HF_TOKEN,
+		trainerUrl: env.TRAINER_URL,
 	};
 }
