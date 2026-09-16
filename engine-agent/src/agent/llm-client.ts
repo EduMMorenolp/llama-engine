@@ -1,0 +1,131 @@
+import OpenAI from "openai";
+import type { ToolSpec } from "../tools/types.js";
+import type { LLMMessage, LLMResponse } from "./types.js";
+
+export interface LLMClientConfig {
+	apiUrl: string;
+	apiKey: string;
+	model: string;
+}
+
+export class LLMClient {
+	private client: OpenAI;
+	private model: string;
+	private baseURL: string;
+
+	constructor(config: LLMClientConfig) {
+		const rawUrl = (config.apiUrl ?? "http://localhost:3050").trim();
+		// Ensure standard /v1 endpoint suffix for OpenAI SDK compatibility
+		this.baseURL = rawUrl.endsWith("/v1") ? rawUrl : `${rawUrl.replace(/\/+$/, "")}/v1`;
+
+		this.client = new OpenAI({
+			baseURL: this.baseURL,
+			apiKey: config.apiKey || "llama-engine-dev",
+		});
+		this.model = config.model || "default";
+	}
+
+	async sendMessage(
+		messages: LLMMessage[],
+		tools: ToolSpec[],
+		model?: string,
+	): Promise<LLMResponse> {
+		const useModel = model ?? this.model;
+		const openaiTools =
+			tools.length > 0
+				? tools.map((t) => ({
+						type: "function" as const,
+						function: {
+							name: t.function.name,
+							description: t.function.description,
+							parameters: t.function.parameters as unknown as Record<string, unknown>,
+						},
+					}))
+				: undefined;
+
+		try {
+			const response = await this.client.chat.completions.create({
+				model: useModel,
+				messages: messages as any,
+				tools: openaiTools as any,
+				tool_choice: tools.length > 0 ? "auto" : undefined,
+				stream: false,
+			});
+
+			const choice = response.choices[0];
+			if (!choice) {
+				throw new Error("El modelo devolvió una respuesta vacía.");
+			}
+
+			return {
+				content: choice.message.content ?? null,
+				tool_calls: choice.message.tool_calls as any,
+				finish_reason: choice.finish_reason,
+			};
+		} catch (err: any) {
+			const status = err.status ?? err.statusCode ?? "";
+			const errorMsg = err.error?.message ?? err.message ?? "Error desconocido";
+			throw new Error(
+				`Error al comunicar con engine-api (${this.baseURL}): ${status ? `[${status}] ` : ""}${errorMsg}`,
+			);
+		}
+	}
+
+	async *sendMessageStream(
+		messages: LLMMessage[],
+		tools: ToolSpec[],
+		model?: string,
+	): AsyncGenerator<{ type: string; data: any }> {
+		const useModel = model ?? this.model;
+		const openaiTools =
+			tools.length > 0
+				? tools.map((t) => ({
+						type: "function" as const,
+						function: {
+							name: t.function.name,
+							description: t.function.description,
+							parameters: t.function.parameters as unknown as Record<string, unknown>,
+						},
+					}))
+				: undefined;
+
+		try {
+			const stream = await this.client.chat.completions.create({
+				model: useModel,
+				messages: messages as any,
+				tools: openaiTools as any,
+				tool_choice: tools.length > 0 ? "auto" : undefined,
+				stream: true,
+			});
+
+			for await (const chunk of stream) {
+				const delta = chunk.choices[0]?.delta;
+				if (delta?.content) {
+					yield { type: "content", data: delta.content };
+				}
+				if (delta?.tool_calls) {
+					for (const tc of delta.tool_calls) {
+						yield { type: "tool_call", data: tc };
+					}
+				}
+				if (chunk.choices[0]?.finish_reason) {
+					yield { type: "finish", data: chunk.choices[0].finish_reason };
+				}
+			}
+		} catch (err: any) {
+			const status = err.status ?? err.statusCode ?? "";
+			const errorMsg = err.error?.message ?? err.message ?? "Error desconocido";
+			throw new Error(
+				`Error al comunicar con engine-api (${this.baseURL}): ${status ? `[${status}] ` : ""}${errorMsg}`,
+			);
+		}
+	}
+
+	getModel(): string {
+		return this.model;
+	}
+
+	getBaseURL(): string {
+		return this.baseURL;
+	}
+}

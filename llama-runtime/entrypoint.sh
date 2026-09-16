@@ -44,6 +44,7 @@ fi
 
 # Alias para el picker de modelos (openai /v1/models devuelve este id)
 ARGS+=(--alias "$MODEL_ID")
+ARGS+=(--no-webui)
 
 echo "==> llama-server flags: ${ARGS[*]}"
 exec llama-server "${ARGS[@]}"
