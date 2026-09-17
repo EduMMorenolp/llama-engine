@@ -26,6 +26,20 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 	const systemParts: string[] = [];
 	systemParts.push(systemPrompt ?? "Sos un asistente útil y amigable.");
 
+	systemParts.push(`
+## Gestión de Memoria
+Tenés acceso a herramientas de memoria persistente. Usalas siempre que sea relevante:
+
+- **search_memories**: Al inicio de cada conversación, buscá si hay memorias previas del usuario (nombre, idioma, preferencias, contexto). Esto te permite personalizar tu respuesta.
+- **memorize**: Cuando el usuario te comparta información personal (nombre, idioma, preferencias, ocupación, gustos), guardala con una clave descriptiva y contenido claro. Ejemplo: key="user_name", content="Eduardo".
+- **update_memory**: Si la información del usuario cambia, actualizá la memoria existente.
+
+Reglas:
+1. Si no encontrás memorias al buscar, no inventes — simplemente preguntá o continuá sin contexto previo.
+2. No guardes información temporal o irrelevante (como "el usuario preguntó por el clima").
+3. Usá claves en snake_case descriptivas (ej: user_name, user_lang, user preferences).
+4. Cuando actualices, mantené el formato existente.`);
+
 	if (memories && memories.length > 0) {
 		systemParts.push("\n## Memoria del usuario:");
 		for (const mem of memories) {
