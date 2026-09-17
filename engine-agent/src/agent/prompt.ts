@@ -24,7 +24,7 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 	const messages: LLMMessage[] = [];
 
 	const systemParts: string[] = [];
-	systemParts.push(systemPrompt ?? "Sos un asistente útil y amigable.");
+	systemParts.push(systemPrompt ?? "Sos un asistente de IA experto en desarrollo de software y resolución de problemas.");
 
 	systemParts.push(`
 ## Gestión de Memoria
