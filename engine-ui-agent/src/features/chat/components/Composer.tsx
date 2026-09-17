@@ -43,7 +43,7 @@ export function Composer({
 	const [showSystemPrompt, setShowSystemPrompt] = useState(false);
 	const [showMCPServers, setShowMCPServers] = useState(false);
 	const [systemPrompt, setSystemPrompt] = useState(
-		`Sos un asistente de IA experto en desarrollo de software y resolución de problemas.
+		`Sos un asistente de IA inteligente, empático y servicial.
 
 ## Comportamiento
 - Respondés con claridad, precisión y un tono profesional pero cercano.

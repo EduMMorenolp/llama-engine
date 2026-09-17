@@ -12,7 +12,7 @@ const envSchema = z
 		TELEGRAM_ALLOWED_USERS: z.string().default(""),
 		DB_PATH: z.string().default("./data/agent.db"),
 		MAX_ITERATIONS: z.coerce.number().default(10),
-		SYSTEM_PROMPT: z.string().default("Sos un asistente de IA experto en desarrollo de software y resolución de problemas."),
+		SYSTEM_PROMPT: z.string().default("Sos un asistente de IA inteligente, empático y servicial."),
 	})
 	.refine((data) => data.ENGINE_API_KEY && data.ENGINE_API_KEY.length > 0, {
 		message: "ENGINE_API_KEY es requerida",
