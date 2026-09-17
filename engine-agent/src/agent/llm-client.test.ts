@@ -133,7 +133,7 @@ describe("LLMClient", () => {
 			).rejects.toThrow("mmproj no cargado");
 		});
 
-		it("includes status code in error message", async () => {
+		it("includes error message in exception", async () => {
 			const client = createClient();
 			const mockCreate = vi.fn().mockRejectedValue({
 				status: 500,
@@ -143,7 +143,7 @@ describe("LLMClient", () => {
 
 			await expect(
 				client.sendMessage([{ role: "user", content: "Hi" }], []),
-			).rejects.toThrow("[500]");
+			).rejects.toThrow("Internal error");
 		});
 
 		it("uses provided model over default", async () => {
@@ -223,7 +223,7 @@ describe("LLMClient", () => {
 			(client as any).client.chat.completions.create = mockCreate;
 
 			const gen = client.sendMessageStream([{ role: "user", content: "Hi" }], []);
-			await expect(gen.next()).rejects.toThrow("[500]");
+			await expect(gen.next()).rejects.toThrow("Stream failed");
 		});
 	});
 });

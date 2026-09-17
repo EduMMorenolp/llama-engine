@@ -68,10 +68,10 @@ export class LLMClient {
 			let friendlyMsg = rawErrorMsg;
 			if (rawErrorMsg.includes("image input is not supported") || rawErrorMsg.includes("mmproj")) {
 				friendlyMsg = `El modelo activo no soporta imágenes (mmproj no cargado). Para analizar imágenes, selecciona un modelo multimodal como "qwen3.5-4b" o "gemma-4-e4b" en la barra de modelos.`;
+			} else if (status === 503 || rawErrorMsg.includes("Loading model")) {
+				friendlyMsg = `El modelo se está cargando en memoria en el motor llama.cpp. Por favor aguarda unos segundos y reintenta tu mensaje.`;
 			}
-			throw new Error(
-				`Error al comunicar con engine-api (${this.baseURL}): ${status ? `[${status}] ` : ""}${friendlyMsg}`,
-			);
+			throw new Error(friendlyMsg);
 		}
 	}
 
@@ -118,10 +118,14 @@ export class LLMClient {
 			}
 		} catch (err: any) {
 			const status = err.status ?? err.statusCode ?? "";
-			const errorMsg = err.error?.message ?? err.message ?? "Error desconocido";
-			throw new Error(
-				`Error al comunicar con engine-api (${this.baseURL}): ${status ? `[${status}] ` : ""}${errorMsg}`,
-			);
+			const rawErrorMsg = err.error?.message ?? err.message ?? "Error desconocido";
+			let friendlyMsg = rawErrorMsg;
+			if (rawErrorMsg.includes("image input is not supported") || rawErrorMsg.includes("mmproj")) {
+				friendlyMsg = `El modelo activo no soporta imágenes (mmproj no cargado). Para analizar imágenes, selecciona un modelo multimodal como "qwen3.5-4b" o "gemma-4-e4b" en la barra de modelos.`;
+			} else if (status === 503 || rawErrorMsg.includes("Loading model")) {
+				friendlyMsg = `El modelo se está cargando en memoria en el motor llama.cpp. Por favor aguarda unos segundos y reintenta tu mensaje.`;
+			}
+			throw new Error(friendlyMsg);
 		}
 	}
 

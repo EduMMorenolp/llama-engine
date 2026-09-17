@@ -171,7 +171,18 @@ export function useChat(): UseChatReturn {
 							break;
 						}
 						case "error": {
-							onError((data.payload.message as string) ?? "Error desconocido en el agente");
+							const errorMsg =
+								(data.payload?.message as string) ?? "Error desconocido en el agente";
+							onMessage({
+								id: randomUUID(),
+								sessionId,
+								role: "assistant",
+								content: `⚠️ **Aviso**: ${errorMsg}`,
+								toolCalls: null,
+								toolCallId: null,
+								createdAt: Date.now(),
+							});
+							onError(errorMsg);
 							setStreaming(false);
 							setCurrentContent("");
 							setToolCalls([]);
@@ -186,7 +197,17 @@ export function useChat(): UseChatReturn {
 
 			ws.onerror = () => {
 				setConnectionState("disconnected");
-				onError("Error de conexión WebSocket con el servidor del agente");
+				const errorMsg = "Error de conexión WebSocket con el servidor del agente";
+				onMessage({
+					id: randomUUID(),
+					sessionId,
+					role: "assistant",
+					content: `⚠️ **Aviso**: ${errorMsg}`,
+					toolCalls: null,
+					toolCallId: null,
+					createdAt: Date.now(),
+				});
+				onError(errorMsg);
 				setStreaming(false);
 				setCurrentContent("");
 				setToolCalls([]);

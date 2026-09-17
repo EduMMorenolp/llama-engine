@@ -9,7 +9,6 @@ import {
 	InfoIcon,
 	PlusIcon,
 	SearchIcon,
-	SettingsIcon,
 	SidebarIcon,
 	SparklesIcon,
 	TerminalIcon,
@@ -117,7 +116,7 @@ export function ChatView() {
 		deleteMessage,
 		loading: sessionsLoading,
 	} = useSessions();
-	const { streaming, currentContent, toolCalls, connectionState, sendMessage, stopStreaming } =
+	const { streaming, currentContent, toolCalls, sendMessage, stopStreaming } =
 		useChat();
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const modelMenuRef = useRef<HTMLDivElement>(null);

@@ -41,7 +41,15 @@ export function createWebSocketServer(
 					);
 				}
 			} catch (err: any) {
-				ws.send(JSON.stringify({ type: "error", payload: { message: err.message } }));
+				const errMsg = err.message || "Error al procesar mensaje";
+				try {
+					const parsed = JSON.parse(data.toString());
+					const sessId = parsed?.payload?.sessionId;
+					if (sessId && store.getSession(sessId)) {
+						store.addMessage(randomUUID(), sessId, "assistant", `⚠️ **Aviso**: ${errMsg}`);
+					}
+				} catch {}
+				ws.send(JSON.stringify({ type: "error", payload: { message: errMsg } }));
 			}
 		});
 

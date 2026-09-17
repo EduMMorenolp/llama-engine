@@ -53,25 +53,81 @@ export async function runAgent(
 	for (let i = 0; i < maxIterations; i++) {
 		iterations++;
 		const toolsToPass = tools.length > 0 ? tools : undefined;
-		const response = await llmClient.sendMessage(messages, toolsToPass, model);
 
-		if (response.tool_calls && response.tool_calls.length > 0) {
+		let accumulatedContent = "";
+		const toolCallMap: Record<number, { id: string; name: string; arguments: string }> = {};
+
+		if (typeof llmClient.sendMessageStream === "function") {
+			const stream = llmClient.sendMessageStream(messages, toolsToPass, model);
+			for await (const chunk of stream) {
+				if (chunk.type === "content" && chunk.data) {
+					accumulatedContent += chunk.data;
+					onEvent?.({ type: "message", payload: { role: "assistant", content: chunk.data } });
+				} else if (chunk.type === "tool_call" && chunk.data) {
+					const idx = chunk.data.index ?? 0;
+					if (!toolCallMap[idx]) {
+						toolCallMap[idx] = {
+							id: chunk.data.id || randomUUID(),
+							name: chunk.data.function?.name || "",
+							arguments: "",
+						};
+					}
+					if (chunk.data.id) {
+						toolCallMap[idx].id = chunk.data.id;
+					}
+					if (chunk.data.function?.name) {
+						toolCallMap[idx].name = chunk.data.function.name;
+					}
+					if (chunk.data.function?.arguments) {
+						toolCallMap[idx].arguments += chunk.data.function.arguments;
+					}
+				}
+			}
+		} else {
+			const response = await llmClient.sendMessage(messages, toolsToPass, model);
+			accumulatedContent = response.content ?? "";
+			if (accumulatedContent) {
+				onEvent?.({ type: "message", payload: { role: "assistant", content: accumulatedContent } });
+			}
+			if (response.tool_calls) {
+				response.tool_calls.forEach((tc, idx) => {
+					toolCallMap[idx] = {
+						id: tc.id || randomUUID(),
+						name: tc.function.name,
+						arguments: tc.function.arguments,
+					};
+				});
+			}
+		}
+
+		const responseToolCalls = Object.values(toolCallMap)
+			.filter((tc) => tc.name)
+			.map((tc) => ({
+				id: tc.id,
+				type: "function" as const,
+				function: {
+					name: tc.name,
+					arguments: tc.arguments,
+				},
+			}));
+
+		if (responseToolCalls.length > 0) {
 			const assistantMsgId = randomUUID();
 			store.addMessage(
 				assistantMsgId,
 				sessionId,
 				"assistant",
-				response.content,
-				JSON.stringify(response.tool_calls),
+				accumulatedContent || null,
+				JSON.stringify(responseToolCalls),
 			);
 
 			messages.push({
 				role: "assistant",
-				content: response.content,
-				tool_calls: response.tool_calls,
+				content: accumulatedContent || null,
+				tool_calls: responseToolCalls,
 			});
 
-			for (const tc of response.tool_calls) {
+			for (const tc of responseToolCalls) {
 				const callId = tc.id || randomUUID();
 				let args: Record<string, unknown> = {};
 				try {
@@ -108,9 +164,8 @@ export async function runAgent(
 				});
 			}
 		} else {
-			finalContent = response.content ?? "";
+			finalContent = accumulatedContent;
 			if (finalContent) {
-				onEvent?.({ type: "message", payload: { role: "assistant", content: finalContent } });
 				const assistantMsgId = randomUUID();
 				store.addMessage(assistantMsgId, sessionId, "assistant", finalContent);
 			}
