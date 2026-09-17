@@ -3,10 +3,12 @@ import {
 	MessageSquareIcon,
 	PlusIcon,
 	SearchIcon,
+	SettingsIcon,
 	SidebarIcon,
 	SparklesIcon,
 	TrashIcon,
 } from "../../../components/ui/Icons.tsx";
+import { SettingsModal } from "../../chat/components/SettingsModal.tsx";
 import { useSessions } from "../hooks/useSessions.ts";
 
 interface SessionListProps {
@@ -25,6 +27,7 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 	} = useSessions();
 
 	const [searchQuery, setSearchQuery] = useState("");
+	const [showSettings, setShowSettings] = useState(false);
 
 	useEffect(() => {
 		loadSessions();
@@ -159,7 +162,18 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 					<div className="connection-dot connected" />
 					<span>Engine v0.1.0</span>
 				</div>
+				<button
+					type="button"
+					className="session-action-btn"
+					onClick={() => setShowSettings(true)}
+					title="Configuración"
+					style={{ opacity: 1, padding: "6px" }}
+				>
+					<SettingsIcon size={16} />
+				</button>
 			</div>
+
+			{showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 		</div>
 	);
 }

@@ -96,3 +96,17 @@ export async function connectMCPServer(
 export async function disconnectMCPServer(id: string): Promise<{ success: boolean }> {
 	return apiPost(`/api/mcp/servers/${id}/disconnect`, {});
 }
+
+export interface ModelInfo {
+	id: string;
+	name: string;
+	size?: string;
+	vision?: boolean;
+	loaded?: boolean;
+	badge?: string;
+	desc?: string;
+}
+
+export async function fetchAvailableModels(): Promise<{ models: ModelInfo[]; activeModel?: string }> {
+	return apiGet<{ models: ModelInfo[]; activeModel?: string }>("/api/models");
+}

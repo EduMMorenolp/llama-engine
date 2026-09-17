@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageSquareIcon, SparklesIcon, XIcon } from "../../../components/ui/Icons.tsx";
 
 interface SystemPromptModalProps {
@@ -33,19 +34,11 @@ export function SystemPromptModal({ prompt, onSave, onClose }: SystemPromptModal
 		onClose();
 	}
 
-	return (
+	return createPortal(
 		<div className="dialog-backdrop">
 			<button
 				type="button"
-				style={{
-					position: "fixed",
-					inset: 0,
-					background: "transparent",
-					border: "none",
-					width: "100%",
-					height: "100%",
-					cursor: "default",
-				}}
+				className="dialog-backdrop-btn"
 				onClick={onClose}
 				aria-label="Cerrar modal"
 			/>
@@ -98,6 +91,7 @@ export function SystemPromptModal({ prompt, onSave, onClose }: SystemPromptModal
 					</button>
 				</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }

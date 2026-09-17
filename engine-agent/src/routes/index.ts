@@ -5,6 +5,8 @@ import { createChatRoutes } from "../modules/chat/routes.js";
 import { MCPController } from "../modules/mcp/controller.js";
 import { MCPManager } from "../modules/mcp/manager.js";
 import { createMCPRoutes } from "../modules/mcp/routes.js";
+import { ModelsController } from "../modules/models/controller.js";
+import { createModelsRoutes } from "../modules/models/routes.js";
 import { MemoryController } from "../modules/memories/controller.js";
 import { createMemoryRoutes } from "../modules/memories/routes.js";
 import { MemoryService } from "../modules/memories/service.js";
@@ -40,6 +42,9 @@ export function createApiRoutes(
 	const mcpManager = new MCPManager(toolRegistry);
 	const mcpController = new MCPController(mcpManager);
 	router.use("/mcp", createMCPRoutes(mcpController));
+
+	const modelsController = new ModelsController();
+	router.use("/models", createModelsRoutes(modelsController));
 
 	router.use("/chat", createChatRoutes(agentConfig, store));
 

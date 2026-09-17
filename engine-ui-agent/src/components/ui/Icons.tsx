@@ -537,3 +537,208 @@ export function GlobeIcon({ size = 18, className = "", ...props }: IconProps) {
 		</svg>
 	);
 }
+
+export function ForkIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<circle cx="12" cy="18" r="3" />
+			<circle cx="6" cy="6" r="3" />
+			<circle cx="18" cy="6" r="3" />
+			<path d="M18 9v2a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9" />
+			<path d="M12 12v3" />
+		</svg>
+	);
+}
+
+export function InfoIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<circle cx="12" cy="12" r="10" />
+			<path d="M12 16v-4" />
+			<path d="M12 8h.01" />
+		</svg>
+	);
+}
+
+
+export function LightbulbIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+			<path d="M9 18h6" />
+			<path d="M10 22h4" />
+		</svg>
+	);
+}
+
+export function ZapIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+		</svg>
+	);
+}
+
+export function ClockIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<circle cx="12" cy="12" r="10" />
+			<polyline points="12 6 12 12 16 14" />
+		</svg>
+	);
+}
+
+export function SlidersIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<line x1="4" x2="4" y1="21" y2="14" />
+			<line x1="4" x2="4" y1="10" y2="3" />
+			<line x1="12" x2="12" y1="21" y2="12" />
+			<line x1="12" x2="12" y1="8" y2="3" />
+			<line x1="20" x2="20" y1="21" y2="16" />
+			<line x1="20" x2="20" y1="12" y2="3" />
+			<line x1="1" x2="7" y1="14" y2="14" />
+			<line x1="9" x2="15" y1="8" y2="8" />
+			<line x1="17" x2="23" y1="16" y2="16" />
+		</svg>
+	);
+}
+
+export function DownloadIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+			<polyline points="7 10 12 15 17 10" />
+			<line x1="12" x2="12" y1="15" y2="3" />
+		</svg>
+	);
+}
+
+export function UploadIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+			<polyline points="17 8 12 3 7 8" />
+			<line x1="12" x2="12" y1="3" y2="15" />
+		</svg>
+	);
+}
+
+export function BoxIcon({ size = 18, className = "", ...props }: IconProps) {
+	return (
+		<svg
+			aria-hidden="true"
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			{...props}
+		>
+			<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+			<polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+			<line x1="12" x2="12" y1="22.08" y2="12" />
+		</svg>
+	);
+}
+

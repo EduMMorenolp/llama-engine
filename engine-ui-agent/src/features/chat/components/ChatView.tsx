@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { fetchAvailableModels, type Message, type ModelInfo } from "../../../api.ts";
 import {
 	CheckIcon,
 	ChevronDownIcon,
 	FileCodeIcon,
+	InfoIcon,
+	PlusIcon,
 	SearchIcon,
+	SettingsIcon,
 	SidebarIcon,
 	SparklesIcon,
 	TerminalIcon,
+	XIcon,
 } from "../../../components/ui/Icons.tsx";
 import { useToast } from "../../../providers/ToastProvider.tsx";
 import { useSessions } from "../../sessions/hooks/useSessions.ts";
@@ -15,42 +20,47 @@ import { useChat } from "../hooks/useChat.ts";
 import { Composer } from "./Composer.tsx";
 import type { FileAttachment } from "./FileUpload.tsx";
 import { MessageBubble } from "./MessageBubble.tsx";
+import { ModelInfoModal } from "./ModelInfoModal.tsx";
+import { SettingsModal } from "./SettingsModal.tsx";
 
 interface LayoutContextType {
 	sidebarOpen: boolean;
 	toggleSidebar: () => void;
 }
 
-const AVAILABLE_MODELS = [
+const FALLBACK_MODELS: ModelInfo[] = [
 	{
-		id: "qwen3.5-agent",
-		name: "Qwen 2.5 Agent",
-		desc: "Optimizado para herramientas y código",
-		badge: "Default",
+		id: "qwen3.5-9b",
+		name: "Qwen 3.5 9B",
+		desc: "Texto · 4.7 GB GGUF",
+		badge: "Activo",
+		loaded: true,
 	},
 	{
-		id: "llama3.3-70b",
-		name: "Llama 3.3 70B",
-		desc: "Razonamiento profundo y conocimiento general",
-		badge: "Meta",
+		id: "qwen3.5-4b",
+		name: "Qwen 3.5 4B",
+		desc: "Multimodal (visión) · 2.6 GB GGUF",
+		badge: "Visión",
+		vision: true,
 	},
 	{
-		id: "deepseek-r1",
-		name: "DeepSeek R1",
-		desc: "Pensamiento explícito y matemáticas/lógica",
-		badge: "Reasoning",
+		id: "gemma-4-e4b",
+		name: "Gemma 4 E4B",
+		desc: "Multimodal (visión) · 4.8 GB GGUF",
+		badge: "Visión",
+		vision: true,
 	},
 	{
-		id: "claude-3.5",
-		name: "Claude 3.5 Sonnet",
-		desc: "Alta precisión en desarrollo y análisis",
-		badge: "Anthropic",
+		id: "mistral-small-7b",
+		name: "Mistral Small 7B",
+		desc: "Texto · 4.1 GB GGUF",
+		badge: "Texto",
 	},
 	{
-		id: "gpt-4o",
-		name: "GPT-4o",
-		desc: "Modelo multimodal insignia",
-		badge: "OpenAI",
+		id: "phi-4-mini",
+		name: "Phi 4 Mini",
+		desc: "Texto · 2.3 GB GGUF",
+		badge: "Compacto",
 	},
 ];
 
@@ -94,10 +104,15 @@ function formatFileSize(bytes: number): string {
 export function ChatView() {
 	const { addToast } = useToast();
 	const {
+		sessions,
 		activeSessionId,
 		messages,
 		addMessage,
 		createNewSession,
+		selectSession,
+		removeSession,
+		forkSession,
+		deleteMessage,
 		loading: sessionsLoading,
 	} = useSessions();
 	const { streaming, currentContent, toolCalls, connectionState, sendMessage, stopStreaming } =
@@ -109,8 +124,30 @@ export function ChatView() {
 		toggleSidebar: () => {},
 	};
 
-	const [selectedModel, setSelectedModel] = useState("qwen3.5-agent");
+	const [models, setModels] = useState<ModelInfo[]>(FALLBACK_MODELS);
+	const [selectedModel, setSelectedModel] = useState("qwen3.5-9b");
 	const [showModelMenu, setShowModelMenu] = useState(false);
+	const [selectedModelInfo, setSelectedModelInfo] = useState<ModelInfo | null>(null);
+	const [showSettings, setShowSettings] = useState(false);
+
+	// Load models from llama.cpp / engine-api
+	useEffect(() => {
+		fetchAvailableModels()
+			.then((res) => {
+				if (res?.models && res.models.length > 0) {
+					setModels(res.models);
+					if (res.activeModel) {
+						setSelectedModel(res.activeModel);
+					} else {
+						const loaded = res.models.find((m) => m.loaded);
+						if (loaded) setSelectedModel(loaded.id);
+					}
+				}
+			})
+			.catch(() => {
+				// Keep fallback
+			});
+	}, []);
 
 	// Close model menu when clicking outside
 	useEffect(() => {
@@ -146,28 +183,30 @@ export function ChatView() {
 			sessionId = session.id;
 		}
 
-		// If there are attachments, build full message for the LLM
-		let fullMessage = text;
+		// If there are attachments, build full message for the LLM & UI
+		let fullMessage = text.trim();
 		if (attachments && attachments.length > 0) {
-			const attachmentsSummary = attachments
-				.map((a) => {
-					if (a.content) {
-						return `[Archivo adjunto: ${a.name} (${formatFileSize(a.size)})]\n\`\`\`\n${a.content}\n\`\`\``;
-					}
-					return `[Archivo adjunto: ${a.name} (${formatFileSize(a.size)})]`;
-				})
-				.join("\n\n");
+			const attachmentsParts = attachments.map((a) => {
+				if (a.preview && a.preview.startsWith("data:image")) {
+					return `![${a.name}](${a.preview})`;
+				}
+				if (a.content) {
+					const ext = a.name.split(".").pop() || "";
+					return `📎 **${a.name}** (${formatFileSize(a.size)})\n\`\`\`${ext}\n${a.content}\n\`\`\``;
+				}
+				return `📎 **${a.name}** (${formatFileSize(a.size)})`;
+			});
 
-			fullMessage = fullMessage ? `${fullMessage}\n\n${attachmentsSummary}` : attachmentsSummary;
+			const attachmentsSummary = attachmentsParts.join("\n\n");
+			fullMessage = fullMessage ? `${attachmentsSummary}\n\n${fullMessage}` : attachmentsSummary;
 		}
 
-		// Display message in UI
-		const displayContent = text || attachments.map((a) => `📎 ${a.name}`).join(", ");
+		// Display full message with attachments in UI
 		addMessage({
 			id: crypto.randomUUID?.() ?? Date.now().toString(),
 			sessionId,
 			role: "user",
-			content: displayContent,
+			content: fullMessage,
 			toolCalls: null,
 			toolCallId: null,
 			createdAt: Date.now(),
@@ -190,9 +229,40 @@ export function ChatView() {
 		);
 	};
 
+	const handleFork = async (messageId: string) => {
+		try {
+			await forkSession(messageId);
+			addToast("success", "Conversación bifurcada con éxito");
+		} catch (err: unknown) {
+			addToast("error", "Error al bifurcar conversación");
+		}
+	};
+
+	const handleDeleteMsg = (messageId: string) => {
+		deleteMessage(messageId);
+		addToast("info", "Mensaje eliminado");
+	};
+
+	const handleReloadMsg = (msg: Message) => {
+		if (msg.role === "user") {
+			handleSend(msg.content ?? "", []);
+		} else {
+			// Find previous user message
+			const idx = messages.findIndex((m) => m.id === msg.id);
+			if (idx > 0) {
+				const prevUserMsg = [...messages.slice(0, idx)].reverse().find((m) => m.role === "user");
+				if (prevUserMsg) {
+					handleSend(prevUserMsg.content ?? "", []);
+				}
+			}
+		}
+	};
+
 	const handleStarterClick = (promptText: string) => {
 		handleSend(promptText, []);
 	};
+
+	const activeModelObj = models.find((m) => m.id === selectedModel) || models[0];
 
 	if (sessionsLoading) {
 		return (
@@ -205,7 +275,7 @@ export function ChatView() {
 
 	return (
 		<div className="main" style={{ width: "100%", height: "100%", position: "relative" }}>
-			{/* Chat Top Navbar */}
+			{/* Chat Top Navbar with Tabs & Controls */}
 			<header className="chat-navbar">
 				<div className="chat-navbar-left" ref={modelMenuRef} style={{ position: "relative" }}>
 					{!sidebarOpen && (
@@ -218,33 +288,78 @@ export function ChatView() {
 							<SidebarIcon size={17} />
 						</button>
 					)}
-					<button
-						type="button"
-						className="model-badge-selector"
-						onClick={() => setShowModelMenu((prev) => !prev)}
-						title="Seleccionar modelo de IA"
-					>
-						<span className="model-dot" />
-						<span>{selectedModel}</span>
-						<ChevronDownIcon
-							size={14}
-							style={{
-								color: "var(--text-muted)",
-								transform: showModelMenu ? "rotate(180deg)" : "none",
-								transition: "transform 0.2s ease",
-							}}
-						/>
-					</button>
 
+					{/* Model Dropdown Button */}
+					<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+						<button
+							type="button"
+							className="model-badge-selector"
+							onClick={() => setShowModelMenu((prev) => !prev)}
+							title="Seleccionar modelo de IA"
+						>
+							<span className="model-dot" />
+							<span>{selectedModel}</span>
+							<ChevronDownIcon
+								size={14}
+								style={{
+									color: "var(--text-muted)",
+									transform: showModelMenu ? "rotate(180deg)" : "none",
+									transition: "transform 0.2s ease",
+								}}
+							/>
+						</button>
+
+						<button
+							type="button"
+							className="action-icon-btn"
+							onClick={() => setSelectedModelInfo(activeModelObj)}
+							title="Información del modelo activo"
+						>
+							<InfoIcon size={15} style={{ color: "var(--text-secondary)" }} />
+						</button>
+					</div>
+
+					{/* Multi-chat Tabs */}
+					<div className="chat-tabs-bar">
+						{sessions.slice(0, 4).map((s) => (
+							<div
+								key={s.id}
+								className={`chat-tab-chip ${s.id === activeSessionId ? "active" : ""}`}
+								onClick={() => selectSession(s.id)}
+							>
+								<span>{s.name || `Chat ${s.id.slice(0, 6)}`}</span>
+								<button
+									type="button"
+									className="chat-tab-close"
+									onClick={(e) => {
+										e.stopPropagation();
+										removeSession(s.id);
+									}}
+									title="Cerrar pestaña"
+								>
+									<XIcon size={12} />
+								</button>
+							</div>
+						))}
+						<button
+							type="button"
+							className="chat-tab-chip new-tab"
+							onClick={() => createNewSession()}
+							title="Nueva pestaña"
+						>
+							<PlusIcon size={13} />
+						</button>
+					</div>
+
+					{/* Model Dropdown Menu */}
 					{showModelMenu && (
 						<div className="popover-menu model-dropdown-popover">
 							<div className="popover-header">
-								<span>Modelos Disponibles</span>
+								<span>Modelos GGUF (llama.cpp)</span>
 							</div>
-							{AVAILABLE_MODELS.map((m) => (
-								<button
+							{models.map((m) => (
+								<div
 									key={m.id}
-									type="button"
 									className={`popover-item ${m.id === selectedModel ? "active-model-item" : ""}`}
 									onClick={() => {
 										setSelectedModel(m.id);
@@ -256,14 +371,38 @@ export function ChatView() {
 											<span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
 												{m.name}
 											</span>
-											<span className="model-tag-badge">{m.badge}</span>
+											{m.badge && (
+												<span
+													className="model-tag-badge"
+													style={{
+														background: m.loaded ? "rgba(16, 185, 129, 0.2)" : undefined,
+														color: m.loaded ? "#10b981" : undefined,
+													}}
+												>
+													{m.badge}
+												</span>
+											)}
 										</div>
 										<span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{m.desc}</span>
 									</div>
-									{m.id === selectedModel && (
-										<CheckIcon size={15} style={{ color: "var(--accent)" }} />
-									)}
-								</button>
+									<div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+										<button
+											type="button"
+											className="session-action-btn"
+											onClick={(e) => {
+												e.stopPropagation();
+												setShowModelMenu(false);
+												setSelectedModelInfo(m);
+											}}
+											title={`Ver información de ${m.name}`}
+										>
+											<InfoIcon size={13} />
+										</button>
+										{m.id === selectedModel && (
+											<CheckIcon size={15} style={{ color: "var(--accent)" }} />
+										)}
+									</div>
+								</div>
 							))}
 						</div>
 					)}
@@ -280,6 +419,15 @@ export function ChatView() {
 									: "Desconectado"}
 						</span>
 					</div>
+
+					<button
+						type="button"
+						className="action-icon-btn"
+						onClick={() => setShowSettings(true)}
+						title="Configuración global"
+					>
+						<SettingsIcon size={16} />
+					</button>
 				</div>
 			</header>
 
@@ -317,7 +465,14 @@ export function ChatView() {
 					) : (
 						<>
 							{messages.map((msg) => (
-								<MessageBubble key={msg.id} message={msg} />
+								<MessageBubble
+									key={msg.id}
+									message={msg}
+									modelName={selectedModel}
+									onFork={handleFork}
+									onDelete={handleDeleteMsg}
+									onReload={handleReloadMsg}
+								/>
 							))}
 
 							{streaming && (currentContent || toolCalls.length > 0) && (
@@ -332,6 +487,7 @@ export function ChatView() {
 										createdAt: Date.now(),
 									}}
 									toolCalls={toolCalls}
+									modelName={selectedModel}
 									isStreaming
 								/>
 							)}
@@ -348,6 +504,17 @@ export function ChatView() {
 				disabled={streaming}
 				model={selectedModel}
 			/>
+
+			{/* Model Information Modal */}
+			{selectedModelInfo && (
+				<ModelInfoModal
+					model={selectedModelInfo}
+					onClose={() => setSelectedModelInfo(null)}
+				/>
+			)}
+
+			{/* Settings Modal */}
+			{showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 		</div>
 	);
 }

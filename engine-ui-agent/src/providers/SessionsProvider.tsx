@@ -17,6 +17,8 @@ interface SessionsContextType {
 	selectSession: (id: string) => Promise<void>;
 	createNewSession: (name?: string, model?: string) => Promise<Session>;
 	removeSession: (id: string) => Promise<void>;
+	forkSession: (upToMessageId: string) => Promise<Session>;
+	deleteMessage: (messageId: string) => void;
 	addMessage: (msg: Message) => void;
 	updateLastMessage: (content: string) => void;
 	setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -93,6 +95,23 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 		[activeSessionId],
 	);
 
+	const forkSession = useCallback(
+		async (upToMessageId: string) => {
+			const active = sessions.find((s) => s.id === activeSessionId);
+			const idx = messages.findIndex((m) => m.id === upToMessageId);
+			const copiedMessages = idx >= 0 ? messages.slice(0, idx + 1) : messages;
+			const newName = active?.name ? `${active.name} (Fork)` : "Chat Fork";
+			const forkedSession = await createNewSession(newName, active?.model ?? undefined);
+			setMessages(copiedMessages.map((m) => ({ ...m, sessionId: forkedSession.id })));
+			return forkedSession;
+		},
+		[activeSessionId, messages, sessions, createNewSession],
+	);
+
+	const deleteMessage = useCallback((messageId: string) => {
+		setMessages((prev) => prev.filter((m) => m.id !== messageId));
+	}, []);
+
 	const addMessage = useCallback((msg: Message) => {
 		setMessages((prev) => [...prev, msg]);
 	}, []);
@@ -118,6 +137,8 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 				selectSession,
 				createNewSession,
 				removeSession,
+				forkSession,
+				deleteMessage,
 				addMessage,
 				updateLastMessage,
 				setMessages,

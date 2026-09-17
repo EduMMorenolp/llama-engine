@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
 	addMCPServer,
 	connectMCPServer,
@@ -92,7 +93,7 @@ export function MCPServersModal({ onClose }: MCPServersModalProps) {
 		}
 	};
 
-	return (
+	return createPortal(
 		<div className="dialog-backdrop">
 			<button
 				type="button"
@@ -259,6 +260,8 @@ export function MCPServersModal({ onClose }: MCPServersModalProps) {
 					</button>
 				</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }
+
