@@ -19,7 +19,7 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 		systemPrompt,
 		memories,
 		maxHistoryChars = DEFAULT_MAX_HISTORY_CHARS,
-		model,
+		model: _model,
 	} = context;
 	const messages: LLMMessage[] = [];
 

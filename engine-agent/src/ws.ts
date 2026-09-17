@@ -25,6 +25,7 @@ export function createWebSocketServer(
 						model,
 						systemPrompt,
 						enabledTools,
+						modelSettings,
 					} = msg.payload ?? {};
 					const sessionId = inputSessionId ?? randomUUID();
 
@@ -34,7 +35,7 @@ export function createWebSocketServer(
 
 					await runAgent(
 						{ ...agentConfig, store },
-						{ sessionId, message, model, systemPrompt, enabledTools },
+						{ sessionId, message, model, systemPrompt, enabledTools, modelSettings },
 						(event) => {
 							ws.send(JSON.stringify(event));
 						},

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { connectWebSocket, fetchHealth, type Message, type StreamEvent } from "../../../api.ts";
 import { randomUUID } from "../../../utils.ts";
+import type { ModelSettings } from "../components/ModelSettingsModal.tsx";
 
 export interface ToolCallInfo {
 	id: string;
@@ -14,6 +15,7 @@ export interface SendMessageOptions {
 	model?: string;
 	systemPrompt?: string;
 	enabledTools?: string[];
+	modelSettings?: ModelSettings;
 }
 
 interface UseChatReturn {
@@ -107,6 +109,7 @@ export function useChat(): UseChatReturn {
 							model: options?.model,
 							systemPrompt: options?.systemPrompt,
 							enabledTools: options?.enabledTools,
+							modelSettings: options?.modelSettings,
 						},
 					}),
 				);

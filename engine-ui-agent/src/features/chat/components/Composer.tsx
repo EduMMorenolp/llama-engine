@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTools } from "../../../api.ts";
-import { PlusIcon, SendIcon, StopIcon, WrenchIcon } from "../../../components/ui/Icons.tsx";
+import { PlusIcon, SendIcon, SlidersIcon, StopIcon, WrenchIcon } from "../../../components/ui/Icons.tsx";
 import { AttachMenu } from "./AttachMenu.tsx";
 import { type FileAttachment, FileUpload, useFileUpload } from "./FileUpload.tsx";
 import { MCPServersModal } from "./MCPServersModal.tsx";
+import {
+	DEFAULT_MODEL_SETTINGS,
+	type ModelSettings,
+	ModelSettingsModal,
+} from "./ModelSettingsModal.tsx";
 import { SystemPromptModal } from "./SystemPromptModal.tsx";
 import { type ToolConfig, ToolSelector } from "./ToolSelector.tsx";
 
@@ -11,7 +16,7 @@ interface ComposerProps {
 	onSend: (
 		text: string,
 		attachments: FileAttachment[],
-		options?: { systemPrompt?: string; enabledTools?: string[] },
+		options?: { systemPrompt?: string; enabledTools?: string[]; modelSettings?: ModelSettings },
 	) => void;
 	onStop: () => void;
 	disabled: boolean;
@@ -42,6 +47,8 @@ export function Composer({
 	const [showToolSelector, setShowToolSelector] = useState(false);
 	const [showSystemPrompt, setShowSystemPrompt] = useState(false);
 	const [showMCPServers, setShowMCPServers] = useState(false);
+	const [showModelSettings, setShowModelSettings] = useState(false);
+	const [modelSettings, setModelSettings] = useState<ModelSettings>(DEFAULT_MODEL_SETTINGS);
 	const [systemPrompt, setSystemPrompt] = useState(
 		`Sos un asistente de IA inteligente, empático y servicial.
 
@@ -104,13 +111,13 @@ Tenés acceso a herramientas de shell, archivos y memoria. Usalas proactivamente
 		if (!trimmed && attachments.length === 0) return;
 		if (disabled) return;
 		const enabledTools = tools.filter((t) => t.enabled).map((t) => t.name);
-		onSend(trimmed, attachments, { systemPrompt, enabledTools });
+		onSend(trimmed, attachments, { systemPrompt, enabledTools, modelSettings });
 		setText("");
 		setAttachments([]);
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 		}
-	}, [text, attachments, disabled, onSend, systemPrompt, tools]);
+	}, [text, attachments, disabled, onSend, systemPrompt, tools, modelSettings]);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
@@ -164,6 +171,15 @@ Tenés acceso a herramientas de shell, archivos y memoria. Usalas proactivamente
 				)}
 
 				{showMCPServers && <MCPServersModal onClose={() => setShowMCPServers(false)} />}
+
+				{showModelSettings && (
+					<ModelSettingsModal
+						settings={modelSettings}
+						modelName={model}
+						onSave={(newSettings) => setModelSettings(newSettings)}
+						onClose={() => setShowModelSettings(false)}
+					/>
+				)}
 
 				{showToolSelector && (
 					<ToolSelector
@@ -229,6 +245,23 @@ Tenés acceso a herramientas de shell, archivos y memoria. Usalas proactivamente
 							}}
 						>
 							<WrenchIcon size={16} />
+						</button>
+
+						<button
+							type="button"
+							className="composer-btn-icon"
+							onClick={() => {
+								setShowAttachMenu(false);
+								setShowToolSelector(false);
+								setShowModelSettings(true);
+							}}
+							title="Parámetros del modelo y razonamiento"
+							style={{
+								position: "relative",
+								color: modelSettings.enableReasoning ? "var(--ai-spark)" : "inherit",
+							}}
+						>
+							<SlidersIcon size={16} />
 						</button>
 					</div>
 

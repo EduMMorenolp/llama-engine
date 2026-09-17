@@ -178,7 +178,7 @@ export function ChatView() {
 	const handleSend = async (
 		text: string,
 		attachments: FileAttachment[],
-		options?: { systemPrompt?: string; enabledTools?: string[] },
+		options?: { systemPrompt?: string; enabledTools?: string[]; modelSettings?: any },
 	) => {
 		let sessionId = activeSessionId;
 		if (!sessionId) {
@@ -222,6 +222,7 @@ export function ChatView() {
 				model: selectedModel,
 				systemPrompt: options?.systemPrompt,
 				enabledTools: options?.enabledTools,
+				modelSettings: options?.modelSettings,
 			},
 			(msg) => addMessage(msg),
 			() => {},

@@ -1,3 +1,12 @@
+export interface ModelSettings {
+	enableReasoning?: boolean;
+	temperature?: number;
+	topP?: number;
+	maxTokens?: number;
+	frequencyPenalty?: number;
+	presencePenalty?: number;
+}
+
 export interface AgentOptions {
 	sessionId: string;
 	message: string;
@@ -6,6 +15,7 @@ export interface AgentOptions {
 	systemPrompt?: string;
 	enabledTools?: string[];
 	maxIterations?: number;
+	modelSettings?: ModelSettings;
 }
 
 export interface AgentResult {

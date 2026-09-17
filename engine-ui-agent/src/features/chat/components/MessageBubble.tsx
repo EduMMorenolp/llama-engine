@@ -43,11 +43,18 @@ interface MessageBubbleProps {
 }
 
 function parseThinking(content: string): { thinking: string; rest: string } {
-	const match = content.match(/<think>([\s\S]*?)<\/think>/);
-	if (match) {
+	const closedMatch = content.match(/<think>([\s\S]*?)<\/think>/);
+	if (closedMatch) {
 		return {
-			thinking: match[1].trim(),
+			thinking: closedMatch[1].trim(),
 			rest: content.replace(/<think>[\s\S]*?<\/think>/, "").trim(),
+		};
+	}
+	const unclosedMatch = content.match(/<think>([\s\S]*)$/);
+	if (unclosedMatch) {
+		return {
+			thinking: unclosedMatch[1].trim(),
+			rest: "",
 		};
 	}
 	return { thinking: "", rest: content };
@@ -209,7 +216,12 @@ export function MessageBubble({
 								</div>
 								{thinkingOpen ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
 							</button>
-							{thinkingOpen && <div className="thinking-body">{thinking}</div>}
+							{thinkingOpen && (
+								<div className="thinking-body">
+									{thinking}
+									{isStreaming && !rest && <span className="streaming-cursor" />}
+								</div>
+							)}
 						</div>
 					)}
 

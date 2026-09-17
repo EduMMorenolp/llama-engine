@@ -26,7 +26,7 @@ export async function runAgent(
 	onEvent?: (event: StreamEvent) => void,
 ): Promise<AgentResult> {
 	const { llmClient, toolRegistry, store, maxIterations, workDir } = config;
-	const { sessionId, message, model, systemPrompt, enabledTools } = options;
+	const { sessionId, message, model, systemPrompt, enabledTools, modelSettings } = options;
 
 	const userMsgId = randomUUID();
 	store.addMessage(userMsgId, sessionId, "user", message);
@@ -38,10 +38,15 @@ export async function runAgent(
 	}
 	const toolContext: ToolContext = { sessionId, workDir, store };
 
+	const reasoningInstruction =
+		modelSettings?.enableReasoning === false
+			? "\n\nInstrucción de respuesta: No uses etiquetas ni bloques de pensamiento <think>. Responde directamente a la consulta."
+			: "";
+
 	const messages: LLMMessage[] = buildPrompt({
 		store,
 		sessionId,
-		systemPrompt,
+		systemPrompt: (systemPrompt ?? "") + reasoningInstruction,
 		memories,
 		model,
 	});
@@ -52,13 +57,13 @@ export async function runAgent(
 
 	for (let i = 0; i < maxIterations; i++) {
 		iterations++;
-		const toolsToPass = tools.length > 0 ? tools : undefined;
+		const toolsToPass = tools;
 
 		let accumulatedContent = "";
 		const toolCallMap: Record<number, { id: string; name: string; arguments: string }> = {};
 
 		if (typeof llmClient.sendMessageStream === "function") {
-			const stream = llmClient.sendMessageStream(messages, toolsToPass, model);
+			const stream = llmClient.sendMessageStream(messages, toolsToPass, model, modelSettings);
 			for await (const chunk of stream) {
 				if (chunk.type === "content" && chunk.data) {
 					accumulatedContent += chunk.data;
@@ -84,7 +89,7 @@ export async function runAgent(
 				}
 			}
 		} else {
-			const response = await llmClient.sendMessage(messages, toolsToPass, model);
+			const response = await llmClient.sendMessage(messages, toolsToPass, model, modelSettings);
 			accumulatedContent = response.content ?? "";
 			if (accumulatedContent) {
 				onEvent?.({ type: "message", payload: { role: "assistant", content: accumulatedContent } });

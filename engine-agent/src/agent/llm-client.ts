@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ToolSpec } from "../tools/types.js";
-import type { LLMMessage, LLMResponse } from "./types.js";
+import type { LLMMessage, LLMResponse, ModelSettings } from "./types.js";
 
 export interface LLMClientConfig {
 	apiUrl: string;
@@ -29,6 +29,7 @@ export class LLMClient {
 		messages: LLMMessage[],
 		tools: ToolSpec[],
 		model?: string,
+		modelSettings?: ModelSettings,
 	): Promise<LLMResponse> {
 		const useModel = model ?? this.model;
 		const openaiTools =
@@ -49,6 +50,11 @@ export class LLMClient {
 				messages: messages as any,
 				tools: openaiTools as any,
 				tool_choice: tools.length > 0 ? "auto" : undefined,
+				temperature: modelSettings?.temperature,
+				top_p: modelSettings?.topP,
+				max_tokens: modelSettings?.maxTokens,
+				presence_penalty: modelSettings?.presencePenalty,
+				frequency_penalty: modelSettings?.frequencyPenalty,
 				stream: false,
 			});
 
@@ -57,8 +63,15 @@ export class LLMClient {
 				throw new Error("El modelo devolvió una respuesta vacía.");
 			}
 
+			let finalContent = choice.message.content ?? null;
+			const reasoning =
+				(choice.message as any).reasoning_content || (choice.message as any).reasoning;
+			if (reasoning && modelSettings?.enableReasoning !== false) {
+				finalContent = `<think>\n${String(reasoning).trim()}\n</think>\n\n${finalContent ?? ""}`;
+			}
+
 			return {
-				content: choice.message.content ?? null,
+				content: finalContent,
 				tool_calls: choice.message.tool_calls as any,
 				finish_reason: choice.finish_reason,
 			};
@@ -79,6 +92,7 @@ export class LLMClient {
 		messages: LLMMessage[],
 		tools: ToolSpec[],
 		model?: string,
+		modelSettings?: ModelSettings,
 	): AsyncGenerator<{ type: string; data: any }> {
 		const useModel = model ?? this.model;
 		const openaiTools =
@@ -99,20 +113,48 @@ export class LLMClient {
 				messages: messages as any,
 				tools: openaiTools as any,
 				tool_choice: tools.length > 0 ? "auto" : undefined,
+				temperature: modelSettings?.temperature,
+				top_p: modelSettings?.topP,
+				max_tokens: modelSettings?.maxTokens,
+				presence_penalty: modelSettings?.presencePenalty,
+				frequency_penalty: modelSettings?.frequencyPenalty,
 				stream: true,
 			});
 
+			let reasoningStarted = false;
+			let reasoningEnded = false;
+
 			for await (const chunk of stream) {
-				const delta = chunk.choices[0]?.delta;
+				const delta = chunk.choices[0]?.delta as any;
+				const reasoningChunk = delta?.reasoning_content ?? delta?.reasoning;
+
+				if (reasoningChunk && modelSettings?.enableReasoning !== false) {
+					if (!reasoningStarted) {
+						reasoningStarted = true;
+						yield { type: "content", data: "<think>\n" };
+					}
+					yield { type: "content", data: reasoningChunk };
+				}
+
 				if (delta?.content) {
+					if (reasoningStarted && !reasoningEnded) {
+						reasoningEnded = true;
+						yield { type: "content", data: "\n</think>\n\n" };
+					}
 					yield { type: "content", data: delta.content };
 				}
+
 				if (delta?.tool_calls) {
 					for (const tc of delta.tool_calls) {
 						yield { type: "tool_call", data: tc };
 					}
 				}
+
 				if (chunk.choices[0]?.finish_reason) {
+					if (reasoningStarted && !reasoningEnded) {
+						reasoningEnded = true;
+						yield { type: "content", data: "\n</think>\n\n" };
+					}
 					yield { type: "finish", data: chunk.choices[0].finish_reason };
 				}
 			}

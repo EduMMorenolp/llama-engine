@@ -20,7 +20,7 @@ export class MCPController {
 	};
 
 	deleteServer = async (req: Request, res: Response): Promise<void> => {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const removed = await this.mcpManager.removeServer(id);
 		if (!removed) {
 			res.status(404).json({ error: "Servidor MCP no encontrado" });
@@ -30,7 +30,7 @@ export class MCPController {
 	};
 
 	connectServer = async (req: Request, res: Response): Promise<void> => {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		try {
 			const result = await this.mcpManager.connect(id);
 			res.json(result);
@@ -40,7 +40,7 @@ export class MCPController {
 	};
 
 	disconnectServer = async (req: Request, res: Response): Promise<void> => {
-		const { id } = req.params;
+		const id = req.params.id as string;
 		const result = await this.mcpManager.disconnect(id);
 		res.json({ success: result });
 	};

@@ -206,7 +206,7 @@ export class MCPManager {
 						function: {
 							name: toolName,
 							description: mcpTool.description || `MCP tool ${mcpTool.name} from ${server.name}`,
-							parameters: mcpTool.inputSchema || { type: "object", properties: {} },
+							parameters: (mcpTool.inputSchema as any) || { type: "object", properties: {} },
 						},
 					},
 					async (args) => {
