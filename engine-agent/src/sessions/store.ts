@@ -1,4 +1,5 @@
 import type { Database } from "sql.js";
+import { saveDb } from "../db/index.js";
 import type { Memory, Message, Session } from "./types.js";
 
 export class SessionStore {
@@ -10,6 +11,7 @@ export class SessionStore {
 			name ?? null,
 			model ?? null,
 		]);
+		saveDb();
 		return this.getSession(id)!;
 	}
 
@@ -51,7 +53,11 @@ export class SessionStore {
 	deleteSession(id: string): boolean {
 		this.db.run("DELETE FROM messages WHERE session_id = ?", [id]);
 		this.db.run("DELETE FROM sessions WHERE id = ?", [id]);
-		return this.db.getRowsModified() > 0;
+		const modified = this.db.getRowsModified() > 0;
+		if (modified) {
+			saveDb();
+		}
+		return modified;
 	}
 
 	updateSession(id: string, data: { name?: string; model?: string }): void {
@@ -69,6 +75,7 @@ export class SessionStore {
 		fields.push("updated_at = unixepoch()");
 		values.push(id);
 		this.db.run(`UPDATE sessions SET ${fields.join(", ")} WHERE id = ?`, values as any[]);
+		saveDb();
 	}
 
 	addMessage(
@@ -84,6 +91,7 @@ export class SessionStore {
 			[id, sessionId, role, content, toolCalls ?? null, toolCallId ?? null],
 		);
 		this.db.run("UPDATE sessions SET updated_at = unixepoch() WHERE id = ?", [sessionId]);
+		saveDb();
 		const stmt = this.db.prepare("SELECT * FROM messages WHERE id = ?");
 		stmt.bind([id]);
 		stmt.step();
@@ -137,6 +145,7 @@ export class SessionStore {
 				JSON.stringify(tags),
 			]);
 		}
+		saveDb();
 		return this.getMemory(key)!;
 	}
 
@@ -180,6 +189,10 @@ export class SessionStore {
 
 	deleteMemory(key: string): boolean {
 		this.db.run("DELETE FROM memories WHERE key = ?", [key]);
-		return this.db.getRowsModified() > 0;
+		const modified = this.db.getRowsModified() > 0;
+		if (modified) {
+			saveDb();
+		}
+		return modified;
 	}
 }

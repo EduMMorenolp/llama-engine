@@ -114,6 +114,7 @@ export function ChatView() {
 		renameSession,
 		forkSession,
 		deleteMessage,
+		loadSessions,
 		loading: sessionsLoading,
 	} = useSessions();
 	const { streaming, currentContent, toolCalls, sendMessage, stopStreaming } =
@@ -139,16 +140,14 @@ export function ChatView() {
 			.then((res) => {
 				if (res?.models && res.models.length > 0) {
 					setModels(res.models);
-					if (res.activeModel) {
-						setSelectedModel(res.activeModel);
-					} else {
-						const loaded = res.models.find((m) => m.loaded);
-						if (loaded) setSelectedModel(loaded.id);
+					const defaultActive = res.models.find((m) => m.loaded) || res.models[0];
+					if (defaultActive) {
+						setSelectedModel(defaultActive.id);
 					}
 				}
 			})
 			.catch(() => {
-				// Keep fallback
+				// Fallback to static model list
 			});
 	}, []);
 
@@ -165,12 +164,19 @@ export function ChatView() {
 		}
 	}, [showModelMenu]);
 
+	// Auto scroll to bottom smoothly
 	const scrollToBottom = useCallback(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, []);
 
 	useEffect(() => {
-		if (messages.length > 0 || currentContent || toolCalls.length > 0) {
+		const timer = setTimeout(scrollToBottom, 50);
+		return () => clearTimeout(timer);
+	}, [scrollToBottom, messages, currentContent]);
+
+	// Auto-scroll when new tool calls are received
+	useEffect(() => {
+		if (toolCalls.length > 0) {
 			scrollToBottom();
 		}
 	}, [scrollToBottom, messages, currentContent, toolCalls]);
@@ -225,7 +231,9 @@ export function ChatView() {
 				modelSettings: options?.modelSettings,
 			},
 			(msg) => addMessage(msg),
-			() => {},
+			() => {
+				loadSessions();
+			},
 			(err) => {
 				console.error("[chat] error:", err);
 				addToast("error", err);

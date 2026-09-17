@@ -1,4 +1,5 @@
 import type { Database } from "sql.js";
+import { saveDb } from "../../db/index.js";
 import type { Memory } from "../../sessions/types.js";
 
 export class MemoryService {
@@ -38,6 +39,7 @@ export class MemoryService {
 				JSON.stringify(tags),
 			]);
 		}
+		saveDb();
 		return this.get(key)!;
 	}
 
@@ -62,6 +64,10 @@ export class MemoryService {
 
 	delete(key: string): boolean {
 		this.db.run("DELETE FROM memories WHERE key = ?", [key]);
-		return this.db.getRowsModified() > 0;
+		const modified = this.db.getRowsModified() > 0;
+		if (modified) {
+			saveDb();
+		}
+		return modified;
 	}
 }

@@ -38,11 +38,19 @@ export function getDbSync(): Database {
 }
 
 export function saveDb(): void {
-	const config = getConfig();
-	if (db && config.DB_PATH && config.DB_PATH !== ":memory:") {
-		const data = db.export();
-		const buffer = Buffer.from(data);
-		fs.writeFileSync(config.DB_PATH, buffer);
+	try {
+		const config = getConfig();
+		if (db && config.DB_PATH && config.DB_PATH !== ":memory:") {
+			const dir = path.dirname(config.DB_PATH);
+			if (!fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true });
+			}
+			const data = db.export();
+			const buffer = Buffer.from(data);
+			fs.writeFileSync(config.DB_PATH, buffer);
+		}
+	} catch (err) {
+		logger.warn(`Error al persistir base de datos: ${err}`);
 	}
 }
 

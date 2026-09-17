@@ -35,6 +35,27 @@ if [[ "$CHAT_TEMPLATE" != "auto" && -n "$CHAT_TEMPLATE" ]]; then
   ARGS+=(--chat-template "$CHAT_TEMPLATE")
 fi
 
+# --- Optimización: KV cache quantization ---
+if [[ -n "${LLAMA_CACHE_TYPE_K:-}" ]]; then
+  ARGS+=(--cache-type-k "$LLAMA_CACHE_TYPE_K")
+fi
+if [[ -n "${LLAMA_CACHE_TYPE_V:-}" ]]; then
+  ARGS+=(--cache-type-v "$LLAMA_CACHE_TYPE_V")
+fi
+
+# --- Optimización: parallel slots ---
+if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
+  ARGS+=(--parallel "$LLAMA_PARALLEL")
+fi
+
+# --- Optimización: threads ---
+if [[ -n "${LLAMA_THREADS:-}" ]]; then
+  ARGS+=(--threads "$LLAMA_THREADS")
+fi
+if [[ -n "${LLAMA_THREADS_BATCH:-}" ]]; then
+  ARGS+=(--threads-batch "$LLAMA_THREADS_BATCH")
+fi
+
 # Vision: si existe mmproj del modelo, activar multimodal
 if [[ "${LLAMA_MMPROJ:-auto}" == "auto" && -f "$MMPROJ_FILE" ]]; then
   ARGS+=(--mmproj "$MMPROJ_FILE")

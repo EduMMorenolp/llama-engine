@@ -1,13 +1,14 @@
 import { z } from "zod";
 
 export const createSessionDto = z.object({
-	name: z.string().min(1).optional(),
-	model: z.string().min(1).optional(),
+	id: z.string().optional(),
+	name: z.string().optional().nullable(),
+	model: z.string().optional().nullable(),
 });
 
 export const updateSessionDto = z.object({
-	name: z.string().min(1).optional(),
-	model: z.string().min(1).optional(),
+	name: z.string().optional().nullable(),
+	model: z.string().optional().nullable(),
 });
 
 export type CreateSessionDto = z.infer<typeof createSessionDto>;

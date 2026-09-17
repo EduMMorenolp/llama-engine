@@ -29,8 +29,22 @@ export function createWebSocketServer(
 					} = msg.payload ?? {};
 					const sessionId = inputSessionId ?? randomUUID();
 
-					if (!store.getSession(sessionId)) {
-						store.createSession(sessionId);
+					let existingSession = store.getSession(sessionId);
+					if (!existingSession) {
+						const cleanMsg = typeof message === "string" ? message.trim() : "";
+						const autoName = cleanMsg
+							? cleanMsg.length > 35
+								? `${cleanMsg.slice(0, 35)}...`
+								: cleanMsg
+							: "Nuevo Chat";
+						existingSession = store.createSession(sessionId, autoName, model);
+					} else if (!existingSession.name || existingSession.name === "Nuevo Chat") {
+						const cleanMsg = typeof message === "string" ? message.trim() : "";
+						if (cleanMsg) {
+							const autoName =
+								cleanMsg.length > 35 ? `${cleanMsg.slice(0, 35)}...` : cleanMsg;
+							store.updateSession(sessionId, { name: autoName });
+						}
 					}
 
 					await runAgent(

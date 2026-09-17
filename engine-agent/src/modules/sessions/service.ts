@@ -1,5 +1,6 @@
 import type { Database } from "sql.js";
 import { NotFoundException } from "../../common/exceptions/http-exception.js";
+import { saveDb } from "../../db/index.js";
 import type { Message, Session } from "../../sessions/types.js";
 import type { CreateSessionDto } from "./dto.js";
 
@@ -7,12 +8,13 @@ export class SessionService {
 	constructor(private db: Database) {}
 
 	createSession(dto: CreateSessionDto): Session {
-		const id = crypto.randomUUID();
+		const id = dto.id || crypto.randomUUID();
 		this.db.run("INSERT INTO sessions (id, name, model) VALUES (?, ?, ?)", [
 			id,
 			dto.name ?? null,
 			dto.model ?? null,
 		]);
+		saveDb();
 		return this.getSession(id);
 	}
 
@@ -54,7 +56,11 @@ export class SessionService {
 	deleteSession(id: string): boolean {
 		this.db.run("DELETE FROM messages WHERE session_id = ?", [id]);
 		this.db.run("DELETE FROM sessions WHERE id = ?", [id]);
-		return this.db.getRowsModified() > 0;
+		const modified = this.db.getRowsModified() > 0;
+		if (modified) {
+			saveDb();
+		}
+		return modified;
 	}
 
 	updateSession(id: string, dto: import("./dto.js").UpdateSessionDto): Session {
@@ -73,6 +79,7 @@ export class SessionService {
 			fields.push("updated_at = unixepoch()");
 			values.push(id);
 			this.db.run(`UPDATE sessions SET ${fields.join(", ")} WHERE id = ?`, values as any[]);
+			saveDb();
 		}
 		return this.getSession(id);
 	}
