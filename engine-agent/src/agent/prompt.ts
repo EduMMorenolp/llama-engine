@@ -87,34 +87,18 @@ Reglas:
 			}
 		} else if (msg.role === "user" && imageMatch) {
 			const imageUrl = imageMatch[2];
-			const imageName = imageMatch[1] || "imagen";
 			let textPart = rawContent.replace(imageMatch[0], "").trim();
 			if (textPart.length > 12000) {
 				textPart = `${textPart.slice(0, 6000)}\n\n... [Contenido truncado] ...\n\n${textPart.slice(-6000)}`;
 			}
 
-			const modelLower = (model ?? "").toLowerCase();
-			const isVision =
-				modelLower.includes("vision") ||
-				modelLower.includes("4b") ||
-				modelLower.includes("gemma") ||
-				modelLower.includes("vl") ||
-				modelLower.includes("llava");
-
-			if (isVision) {
-				convertedMessages.push({
-					role: "user",
-					content: [
-						{ type: "text", text: textPart || "Por favor analiza la imagen adjunta." },
-						{ type: "image_url", image_url: { url: imageUrl } },
-					],
-				});
-			} else {
-				convertedMessages.push({
-					role: "user",
-					content: `${textPart ? `${textPart}\n\n` : ""}[Archivo adjunto: ${imageName} (Imagen)]\n(Nota: El modelo seleccionado "${model || "texto"}" es un modelo de texto y no tiene cargado el proyector de visión mmproj. Si el usuario pide ver, transcribir o responder sobre la imagen, explícale que debe seleccionar un modelo con soporte multimodal como qwen3.5-4b o gemma-4-e4b en el selector de modelos)`,
-				});
-			}
+			convertedMessages.push({
+				role: "user",
+				content: [
+					{ type: "text", text: textPart || "Por favor analiza la imagen adjunta." },
+					{ type: "image_url", image_url: { url: imageUrl } },
+				],
+			});
 		} else {
 			let content = rawContent;
 			if (content.length > 12000) {

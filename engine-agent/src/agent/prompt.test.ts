@@ -166,7 +166,7 @@ describe("prompt", () => {
 			expect(Array.isArray(userMsg!.content)).toBe(true);
 		});
 
-		it("falls back to text for non-vision models with images", () => {
+		it("formats image messages as multimodal image_url parts", () => {
 			const base64Img = "data:image/png;base64,iVBORw0KGgo=";
 			const store = createMockStore([
 				{
@@ -179,12 +179,13 @@ describe("prompt", () => {
 			const messages = buildPrompt({
 				store,
 				sessionId: "s1",
-				model: "llama3.2",
+				model: "qwen3.5-4b",
 			});
 			const userMsg = messages.find((m) => m.role === "user");
 			expect(userMsg).toBeDefined();
-			expect(typeof userMsg!.content).toBe("string");
-			expect(userMsg!.content).toContain("modelo de texto");
+			expect(Array.isArray(userMsg!.content)).toBe(true);
+			const parts = userMsg!.content as any[];
+			expect(parts.some((p) => p.type === "image_url")).toBe(true);
 		});
 	});
 
