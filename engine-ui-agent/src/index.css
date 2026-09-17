@@ -529,7 +529,8 @@ body,
 
 .chat-navbar-left {
 	display: flex;
-	align-items: center;
+	width: 100%;
+	justify-content: space-between;
 	gap: 12px;
 }
 
@@ -1947,7 +1948,6 @@ button.active-glow {
 	gap: 6px;
 	margin-left: 8px;
 	overflow-x: auto;
-	max-width: 440px;
 }
 
 .chat-tab-chip {

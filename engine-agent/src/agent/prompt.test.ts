@@ -65,6 +65,127 @@ describe("prompt", () => {
 			expect(messages[3].role).toBe("tool");
 			expect(messages[3].tool_call_id).toBe("tc1");
 		});
+		it("uses default system prompt when none provided", () => {
+			const store = createMockStore();
+			const messages = buildPrompt({ store, sessionId: "s1" });
+			expect(messages[0].content).toContain("asistente de IA");
+		});
+
+		it("includes memory management instructions", () => {
+			const store = createMockStore();
+			const messages = buildPrompt({
+				store,
+				sessionId: "s1",
+				systemPrompt: "Custom prompt.",
+			});
+			const content = messages[0].content as string;
+			expect(content).toContain("Gestión de Memoria");
+			expect(content).toContain("search_memories");
+			expect(content).toContain("memorize");
+			expect(content).toContain("update_memory");
+			expect(content).toContain("snake_case");
+		});
+
+		it("truncates history when exceeding maxHistoryChars", () => {
+			const longMessage = { role: "user", content: "x".repeat(20000), toolCalls: null, toolCallId: null };
+			const store = createMockStore([
+				longMessage,
+				longMessage,
+				longMessage,
+				longMessage,
+				longMessage,
+			]);
+			const messages = buildPrompt({ store, sessionId: "s1", maxHistoryChars: 30000 });
+			expect(messages[0].role).toBe("system");
+			// Should keep first + some recent, skip middle
+			const userMsgs = messages.filter((m) => m.role === "user");
+			expect(userMsgs.length).toBeLessThanOrEqual(3);
+		});
+
+		it("does not truncate when under maxHistoryChars", () => {
+			const store = createMockStore([
+				{ role: "user", content: "short", toolCalls: null, toolCallId: null },
+				{ role: "assistant", content: "ok", toolCalls: null, toolCallId: null },
+			]);
+			const messages = buildPrompt({ store, sessionId: "s1", maxHistoryChars: 60000 });
+			expect(messages).toHaveLength(3);
+		});
+
+		it("handles invalid toolCalls JSON gracefully", () => {
+			const store = createMockStore([
+				{ role: "user", content: "test", toolCalls: null, toolCallId: null },
+				{
+					role: "assistant",
+					content: "some text",
+					toolCalls: "invalid json {{{",
+					toolCallId: null,
+				},
+			]);
+			const messages = buildPrompt({ store, sessionId: "s1" });
+			expect(messages).toHaveLength(3);
+			expect(messages[2].role).toBe("assistant");
+			// Falls back to content only, no tool_calls
+			expect(messages[2].tool_calls).toBeUndefined();
+		});
+
+		it("truncates long tool result content", () => {
+			const store = createMockStore([
+				{ role: "user", content: "test", toolCalls: null, toolCallId: null },
+				{
+					role: "assistant",
+					content: null,
+					toolCalls: '[{"id":"tc1","type":"function","function":{"name":"bash","arguments":"{}"}}]',
+					toolCallId: null,
+				},
+				{ role: "tool", content: "x".repeat(20000), toolCalls: null, toolCallId: "tc1" },
+			]);
+			const messages = buildPrompt({ store, sessionId: "s1" });
+			const toolMsg = messages.find((m) => m.role === "tool");
+			expect(toolMsg).toBeDefined();
+			expect((toolMsg!.content as string).length).toBeLessThan(20000);
+			expect(toolMsg!.content).toContain("truncado");
+		});
+
+		it("detects vision models for image messages", () => {
+			const base64Img = "data:image/png;base64,iVBORw0KGgo=";
+			const store = createMockStore([
+				{
+					role: "user",
+					content: `![test](${base64Img})`,
+					toolCalls: null,
+					toolCallId: null,
+				},
+			]);
+			const messages = buildPrompt({
+				store,
+				sessionId: "s1",
+				model: "qwen3.5-4b",
+			});
+			const userMsg = messages.find((m) => m.role === "user");
+			expect(userMsg).toBeDefined();
+			expect(Array.isArray(userMsg!.content)).toBe(true);
+		});
+
+		it("falls back to text for non-vision models with images", () => {
+			const base64Img = "data:image/png;base64,iVBORw0KGgo=";
+			const store = createMockStore([
+				{
+					role: "user",
+					content: `![test](${base64Img})`,
+					toolCalls: null,
+					toolCallId: null,
+				},
+			]);
+			const messages = buildPrompt({
+				store,
+				sessionId: "s1",
+				model: "llama3.2",
+			});
+			const userMsg = messages.find((m) => m.role === "user");
+			expect(userMsg).toBeDefined();
+			expect(typeof userMsg!.content).toBe("string");
+			expect(userMsg!.content).toContain("modelo de texto");
+		});
 	});
 
 	describe("getMemoriesForContext", () => {
@@ -79,6 +200,12 @@ describe("prompt", () => {
 			const memories = getMemoriesForContext(store);
 			expect(memories).toHaveLength(2);
 			expect(memories[0]).toEqual({ key: "name", content: "Eduardo" });
+		});
+
+		it("returns empty array when no memories", () => {
+			const store = createMockStore([], []);
+			const memories = getMemoriesForContext(store);
+			expect(memories).toEqual([]);
 		});
 	});
 });

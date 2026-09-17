@@ -198,4 +198,120 @@ describe("agent loop", () => {
 		expect(result.content).toBe("Recovered");
 		expect(result.toolCalls[0].result).toContain("Error");
 	});
+
+	it("filters tools when enabledTools is provided", async () => {
+		const llm = createMockLLM([], "Done");
+		const store = createMockStore();
+		const registry = new ToolRegistry();
+		registry.register(createTestTool("tool_a"), async () => "a");
+		registry.register(createTestTool("tool_b"), async () => "b");
+
+		const config: AgentLoopConfig = {
+			llmClient: llm,
+			toolRegistry: registry,
+			store,
+			maxIterations: 10,
+			workDir: "/tmp",
+		};
+
+		await runAgent(config, {
+			sessionId: "s1",
+			message: "go",
+			enabledTools: ["tool_a"],
+		});
+
+		// LLM should have received only tool_a in the tools list
+		const callArgs = llm.sendMessage.mock.calls[0];
+		const toolsPassed = callArgs[1];
+		expect(toolsPassed).toHaveLength(1);
+		expect(toolsPassed[0].function.name).toBe("tool_a");
+	});
+
+	it("provides closure message when loop ends without text after tool calls", async () => {
+		const llm = createMockLLM();
+		llm.sendMessage = vi.fn().mockResolvedValue({
+			content: null,
+			tool_calls: [
+				{
+					id: "tc1",
+					type: "function",
+					function: { name: "bash", arguments: '{"command":"echo"}' },
+				},
+			],
+			finish_reason: "tool_calls",
+		});
+
+		const store = createMockStore();
+		const registry = new ToolRegistry();
+		registry.register(createTestTool("bash"), async () => "ok");
+
+		const config: AgentLoopConfig = {
+			llmClient: llm,
+			toolRegistry: registry,
+			store,
+			maxIterations: 1,
+			workDir: "/tmp",
+		};
+
+		const result = await runAgent(config, { sessionId: "s1", message: "go" });
+		expect(result.content).toContain("completado");
+	});
+
+	it("handles invalid tool_calls JSON gracefully", async () => {
+		const llm = createMockLLM();
+		llm.sendMessage = vi
+			.fn()
+			.mockResolvedValueOnce({
+				content: null,
+				tool_calls: [
+					{
+						id: "tc1",
+						type: "function",
+						function: { name: "bash", arguments: "not json !!!" },
+					},
+				],
+				finish_reason: "tool_calls",
+			})
+			.mockResolvedValueOnce({
+				content: "After error",
+				tool_calls: undefined,
+				finish_reason: "stop",
+			});
+
+		const store = createMockStore();
+		const registry = new ToolRegistry();
+		registry.register(createTestTool("bash"), async () => "ok");
+
+		const config: AgentLoopConfig = {
+			llmClient: llm,
+			toolRegistry: registry,
+			store,
+			maxIterations: 10,
+			workDir: "/tmp",
+		};
+
+		const result = await runAgent(config, { sessionId: "s1", message: "go" });
+		expect(result.content).toBe("After error");
+	});
+
+	it("emits message event on final content", async () => {
+		const llm = createMockLLM([], "Final answer");
+		const store = createMockStore();
+		const registry = new ToolRegistry();
+
+		const config: AgentLoopConfig = {
+			llmClient: llm,
+			toolRegistry: registry,
+			store,
+			maxIterations: 10,
+			workDir: "/tmp",
+		};
+
+		const events: any[] = [];
+		await runAgent(config, { sessionId: "s1", message: "hi" }, (e) => events.push(e));
+
+		const msgEvent = events.find((e) => e.type === "message");
+		expect(msgEvent).toBeDefined();
+		expect(msgEvent.payload.content).toBe("Final answer");
+	});
 });

@@ -451,28 +451,6 @@ export function ChatView() {
 						</div>
 					)}
 				</div>
-
-				<div className="chat-navbar-right">
-					<div className="connection-pill">
-						<div className={`connection-dot ${connectionState}`} />
-						<span>
-							{connectionState === "connected"
-								? "Conectado"
-								: connectionState === "reconnecting"
-									? "Reconectando"
-									: "Desconectado"}
-						</span>
-					</div>
-
-					<button
-						type="button"
-						className="action-icon-btn"
-						onClick={() => setShowSettings(true)}
-						title="Configuración global"
-					>
-						<SettingsIcon size={16} />
-					</button>
-				</div>
 			</header>
 
 			{/* Message Stream */}
