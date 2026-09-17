@@ -4,6 +4,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../../../api.ts";
+import logoImg from "../../../assets/logo.jpg";
 import {
 	CheckIcon,
 	ChevronDownIcon,
@@ -14,7 +15,6 @@ import {
 	ForkIcon,
 	LightbulbIcon,
 	RefreshCwIcon,
-	SparklesIcon,
 	TerminalIcon,
 	TrashIcon,
 	UserIcon,
@@ -135,8 +135,13 @@ export function MessageBubble({
 	const { thinking, rest } = parseThinking(content);
 	const displayContent = rest || content;
 
-	// Estimate token metrics
-	const tokenCount = Math.max(1, Math.round(displayContent.length / 3.8));
+	// Estimate token metrics (excluding base64 payload to reflect true token count)
+	const cleanContentForMetrics = displayContent.replace(/!\[.*?\]\(data:image\/[^;]+;base64,[^)]+\)/g, "");
+	const hasImageAttachment = displayContent.includes("data:image/");
+	const tokenCount = Math.max(
+		1,
+		Math.round(cleanContentForMetrics.length / 3.8) + (hasImageAttachment ? 320 : 0),
+	);
 	const durationSeconds = (tokenCount / (isUser ? 600 : 45)).toFixed(1);
 	const tokensPerSecond = isUser ? "662.66" : (tokenCount / Math.max(0.2, parseFloat(durationSeconds))).toFixed(2);
 
@@ -154,16 +159,21 @@ export function MessageBubble({
 	}
 
 	const handleCopyMessage = async () => {
-		await navigator.clipboard.writeText(displayContent);
+		const cleanForClipboard = displayContent.replace(/!\[(.*?)\]\(data:image\/[^;]+;base64,[^)]+\)/g, "[Imagen: $1]");
+		await navigator.clipboard.writeText(cleanForClipboard);
 		setCopiedMsg(true);
-		onCopy?.(displayContent);
+		onCopy?.(cleanForClipboard);
 		setTimeout(() => setCopiedMsg(false), 2000);
 	};
 
 	return (
 		<div className={`message-row ${isUser ? "user" : "assistant"}`}>
 			<div className={`message-avatar ${isUser ? "user" : "assistant"}`}>
-				{isUser ? <UserIcon size={18} /> : <SparklesIcon size={18} />}
+				{isUser ? (
+					<UserIcon size={18} />
+				) : (
+					<img src={logoImg} alt="AI" className="assistant-avatar-img" />
+				)}
 			</div>
 
 			<div className="message-body-container">
@@ -245,12 +255,16 @@ export function MessageBubble({
 						<div className="markdown-content">
 							<ReactMarkdown
 								remarkPlugins={[remarkGfm]}
+								urlTransform={(url) => url}
 								components={{
+									p(props) {
+										return <div className="markdown-paragraph">{props.children}</div>;
+									},
 									img(props) {
 										const { src, alt } = props;
 										if (!src) return null;
 										return (
-											<div className="attached-media-container">
+											<span className="attached-media-container">
 												<img
 													src={src}
 													alt={alt || "Imagen adjunta"}
@@ -259,8 +273,8 @@ export function MessageBubble({
 													onClick={() => window.open(src, "_blank")}
 													title="Ver imagen en tamaño completo"
 												/>
-												{alt && <div className="attached-media-name">{alt}</div>}
-											</div>
+												{alt && <span className="attached-media-name">{alt}</span>}
+											</span>
 										);
 									},
 									code(props) {

@@ -27,7 +27,7 @@ export interface StreamEvent {
 
 export interface LLMMessage {
 	role: "system" | "user" | "assistant" | "tool";
-	content: string | null;
+	content: string | any[] | null;
 	tool_calls?: LLMToolCall[];
 	tool_call_id?: string;
 }

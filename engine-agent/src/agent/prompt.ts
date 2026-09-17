@@ -7,6 +7,7 @@ export interface PromptContext {
 	systemPrompt?: string;
 	memories?: Array<{ key: string; content: string }>;
 	maxHistoryChars?: number;
+	model?: string;
 }
 
 const DEFAULT_MAX_HISTORY_CHARS = 60000; // ~15,000 tokens safe budget
@@ -18,6 +19,7 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 		systemPrompt,
 		memories,
 		maxHistoryChars = DEFAULT_MAX_HISTORY_CHARS,
+		model,
 	} = context;
 	const messages: LLMMessage[] = [];
 
@@ -37,19 +39,26 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 	const convertedMessages: LLMMessage[] = [];
 
 	for (const msg of rawHistory) {
-		let content = msg.content ?? "";
-		// Safety cap on individual messages in history (e.g. 12KB)
-		if (content.length > 12000) {
-			content = `${content.slice(0, 6000)}\n\n... [Contenido truncado para ajuste de contexto] ...\n\n${content.slice(-6000)}`;
-		}
+		const rawContent = msg.content ?? "";
+
+		// Check for embedded markdown base64 images: ![alt](data:image/...;base64,...)
+		const imageMatch = rawContent.match(/!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/);
 
 		if (msg.role === "tool") {
+			let content = rawContent;
+			if (content.length > 12000) {
+				content = `${content.slice(0, 6000)}\n\n... [Contenido truncado para ajuste de contexto] ...\n\n${content.slice(-6000)}`;
+			}
 			convertedMessages.push({
 				role: "tool",
 				content,
 				tool_call_id: msg.toolCallId ?? undefined,
 			});
 		} else if (msg.toolCalls) {
+			let content = rawContent;
+			if (content.length > 12000) {
+				content = `${content.slice(0, 6000)}\n\n... [Contenido truncado para ajuste de contexto] ...\n\n${content.slice(-6000)}`;
+			}
 			try {
 				convertedMessages.push({
 					role: "assistant",
@@ -62,7 +71,41 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 					content,
 				});
 			}
+		} else if (msg.role === "user" && imageMatch) {
+			const imageUrl = imageMatch[2];
+			const imageName = imageMatch[1] || "imagen";
+			let textPart = rawContent.replace(imageMatch[0], "").trim();
+			if (textPart.length > 12000) {
+				textPart = `${textPart.slice(0, 6000)}\n\n... [Contenido truncado] ...\n\n${textPart.slice(-6000)}`;
+			}
+
+			const modelLower = (model ?? "").toLowerCase();
+			const isVision =
+				modelLower.includes("vision") ||
+				modelLower.includes("4b") ||
+				modelLower.includes("gemma") ||
+				modelLower.includes("vl") ||
+				modelLower.includes("llava");
+
+			if (isVision) {
+				convertedMessages.push({
+					role: "user",
+					content: [
+						{ type: "text", text: textPart || "Por favor analiza la imagen adjunta." },
+						{ type: "image_url", image_url: { url: imageUrl } },
+					],
+				});
+			} else {
+				convertedMessages.push({
+					role: "user",
+					content: `${textPart ? `${textPart}\n\n` : ""}[Archivo adjunto: ${imageName} (Imagen)]\n(Nota: El modelo seleccionado "${model || "texto"}" es un modelo de texto y no tiene cargado el proyector de visión mmproj. Si el usuario pide ver, transcribir o responder sobre la imagen, explícale que debe seleccionar un modelo con soporte multimodal como qwen3.5-4b o gemma-4-e4b en el selector de modelos)`,
+				});
+			}
 		} else {
+			let content = rawContent;
+			if (content.length > 12000) {
+				content = `${content.slice(0, 6000)}\n\n... [Contenido truncado para ajuste de contexto] ...\n\n${content.slice(-6000)}`;
+			}
 			convertedMessages.push({
 				role: msg.role as "user" | "assistant",
 				content,
@@ -70,11 +113,20 @@ export function buildPrompt(context: PromptContext): LLMMessage[] {
 		}
 	}
 
-	// Calculate total characters and trim from earliest messages if exceeding budget
-	let totalChars = convertedMessages.reduce(
-		(sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0),
-		0,
-	);
+	// Calculate total characters (ignoring image base64 length for budget calculation)
+	let totalChars = convertedMessages.reduce((sum, m) => {
+		if (typeof m.content === "string") return sum + m.content.length;
+		if (Array.isArray(m.content)) {
+			return (
+				sum +
+				m.content.reduce((innerSum, part) => {
+					if (part.type === "text" && part.text) return innerSum + part.text.length;
+					return innerSum + 1000; // Count image as equivalent ~250 tokens
+				}, 0)
+			);
+		}
+		return sum;
+	}, 0);
 
 	if (totalChars > maxHistoryChars && convertedMessages.length > 2) {
 		// Keep the first message (initial intent) and latest messages

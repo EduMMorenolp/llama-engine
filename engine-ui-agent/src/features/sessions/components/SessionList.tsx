@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import logoImg from "../../../assets/logo.jpg";
 import {
 	MessageSquareIcon,
 	PlusIcon,
 	SearchIcon,
 	SettingsIcon,
 	SidebarIcon,
-	SparklesIcon,
 	TrashIcon,
 } from "../../../components/ui/Icons.tsx";
 import { SettingsModal } from "../../chat/components/SettingsModal.tsx";
@@ -33,14 +33,14 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 		loadSessions();
 	}, [loadSessions]);
 
-	// Keyboard shortcut for New Chat (Ctrl+K or Alt+N)
+	// Global shortcut for new chat: Ctrl+K or Cmd+K
 	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
+		function handleKeyDown(e: KeyboardEvent) {
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
 				e.preventDefault();
 				createNewSession();
 			}
-		};
+		}
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [createNewSession]);
@@ -56,7 +56,7 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 			<div className="sidebar-header">
 				<div className="sidebar-brand">
 					<div className="sidebar-brand-icon">
-						<SparklesIcon size={18} />
+						<img src={logoImg} alt="Llama Engine" className="sidebar-brand-img" />
 					</div>
 					<div className="sidebar-brand-text">
 						<span className="sidebar-brand-name">Llama Engine</span>

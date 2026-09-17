@@ -43,6 +43,7 @@ export async function runAgent(
 		sessionId,
 		systemPrompt,
 		memories,
+		model,
 	});
 
 	const allToolCalls: ToolCallResult[] = [];
