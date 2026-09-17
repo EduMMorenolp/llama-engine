@@ -57,6 +57,26 @@ export class SessionService {
 		return this.db.getRowsModified() > 0;
 	}
 
+	updateSession(id: string, dto: import("./dto.js").UpdateSessionDto): Session {
+		this.getSession(id);
+		const fields: string[] = [];
+		const values: unknown[] = [];
+		if (dto.name !== undefined) {
+			fields.push("name = ?");
+			values.push(dto.name);
+		}
+		if (dto.model !== undefined) {
+			fields.push("model = ?");
+			values.push(dto.model);
+		}
+		if (fields.length > 0) {
+			fields.push("updated_at = unixepoch()");
+			values.push(id);
+			this.db.run(`UPDATE sessions SET ${fields.join(", ")} WHERE id = ?`, values as any[]);
+		}
+		return this.getSession(id);
+	}
+
 	getMessages(sessionId: string): Message[] {
 		const stmt = this.db.prepare(
 			"SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC",

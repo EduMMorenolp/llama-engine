@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, connectWebSocket } from "./lib/api-client.ts";
+import { apiDelete, apiGet, apiPatch, apiPost, connectWebSocket } from "./lib/api-client.ts";
 
 export { connectWebSocket };
 
@@ -38,6 +38,13 @@ export async function fetchSessions(): Promise<Session[]> {
 
 export async function createSession(name?: string, model?: string): Promise<Session> {
 	return apiPost<Session>("/api/sessions", { name, model });
+}
+
+export async function updateSession(
+	id: string,
+	data: { name?: string; model?: string },
+): Promise<Session> {
+	return apiPatch<Session>(`/api/sessions/${id}`, data);
 }
 
 export async function fetchSession(id: string): Promise<Session & { messages: Message[] }> {

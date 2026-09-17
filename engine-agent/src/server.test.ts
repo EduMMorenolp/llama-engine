@@ -103,6 +103,21 @@ describe("server", () => {
 		});
 	});
 
+	describe("PATCH /api/sessions/:id", () => {
+		it("renames a session", async () => {
+			const create = await request(app)
+				.post("/api/sessions")
+				.set("x-api-key", "test-key")
+				.send({ name: "Original Title" });
+			const res = await request(app)
+				.patch(`/api/sessions/${create.body.id}`)
+				.set("x-api-key", "test-key")
+				.send({ name: "Renamed Title" });
+			expect(res.status).toBe(200);
+			expect(res.body.name).toBe("Renamed Title");
+		});
+	});
+
 	describe("GET /api/tools", () => {
 		it("returns tool list", async () => {
 			const res = await request(app).get("/api/tools").set("x-api-key", "test-key");

@@ -32,4 +32,11 @@ export class SessionController {
 		}
 		res.json({ ok: true });
 	};
+
+	update = (req: Request, res: Response, _next: NextFunction) => {
+		const id = String(req.params.id);
+		const dto = req.body;
+		const session = this.service.updateSession(id, dto);
+		res.json(session);
+	};
 }

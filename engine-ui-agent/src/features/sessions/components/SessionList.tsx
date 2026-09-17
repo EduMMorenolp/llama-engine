@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import logoImg from "../../../assets/logo.jpg";
 import {
+	CheckIcon,
+	EditIcon,
 	MessageSquareIcon,
 	PlusIcon,
 	SearchIcon,
 	SettingsIcon,
 	SidebarIcon,
 	TrashIcon,
+	XIcon,
 } from "../../../components/ui/Icons.tsx";
 import { SettingsModal } from "../../chat/components/SettingsModal.tsx";
 import { useSessions } from "../hooks/useSessions.ts";
@@ -24,10 +27,14 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 		createNewSession,
 		selectSession,
 		removeSession,
+		renameSession,
 	} = useSessions();
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showSettings, setShowSettings] = useState(false);
+	const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+	const [editingName, setEditingName] = useState("");
+	const editInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		loadSessions();
@@ -44,6 +51,27 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [createNewSession]);
+
+	const handleStartEdit = (s: { id: string; name: string | null }, e?: React.MouseEvent) => {
+		if (e) e.stopPropagation();
+		setEditingSessionId(s.id);
+		setEditingName(s.name || `Chat ${s.id.slice(0, 6)}`);
+		setTimeout(() => {
+			editInputRef.current?.focus();
+			editInputRef.current?.select();
+		}, 20);
+	};
+
+	const handleSaveEdit = async (sessionId: string) => {
+		if (editingName.trim()) {
+			await renameSession(sessionId, editingName.trim());
+		}
+		setEditingSessionId(null);
+	};
+
+	const handleCancelEdit = () => {
+		setEditingSessionId(null);
+	};
 
 	const filteredSessions = useMemo(() => {
 		if (!searchQuery.trim()) return sessions;
@@ -112,48 +140,118 @@ export function SessionList({ onToggleSidebar }: SessionListProps) {
 						{searchQuery ? "No se encontraron coincidencias" : "Sin conversaciones aún"}
 					</div>
 				) : (
-					filteredSessions.map((session) => (
-						<div
-							key={session.id}
-							className={`session-item ${session.id === activeSessionId ? "active" : ""}`}
-						>
-							<button
-								type="button"
-								className="session-item-main"
-								onClick={() => selectSession(session.id)}
-								style={{
-									background: "none",
-									border: "none",
-									color: "inherit",
-									cursor: "pointer",
-									textAlign: "left",
-									width: "100%",
-									padding: 0,
-								}}
-							>
-								<span className="session-item-icon">
-									<MessageSquareIcon size={15} />
-								</span>
-								<span className="session-name">
-									{session.name || `Chat ${session.id.slice(0, 6)}`}
-								</span>
-							</button>
+					filteredSessions.map((session) => {
+						const isEditing = editingSessionId === session.id;
+						const displayName = session.name || `Chat ${session.id.slice(0, 6)}`;
 
-							<div className="session-item-actions">
-								<button
-									type="button"
-									className="session-action-btn"
-									title="Eliminar conversación"
-									onClick={(e) => {
-										e.stopPropagation();
-										removeSession(session.id);
-									}}
-								>
-									<TrashIcon size={14} />
-								</button>
+						return (
+							<div
+								key={session.id}
+								className={`session-item ${session.id === activeSessionId ? "active" : ""}`}
+								onDoubleClick={() => !isEditing && handleStartEdit(session)}
+							>
+								{isEditing ? (
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: "6px",
+											width: "100%",
+										}}
+									>
+										<span className="session-item-icon">
+											<MessageSquareIcon size={15} />
+										</span>
+										<input
+											ref={editInputRef}
+											type="text"
+											className="session-rename-input"
+											value={editingName}
+											onChange={(e) => setEditingName(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													handleSaveEdit(session.id);
+												} else if (e.key === "Escape") {
+													e.preventDefault();
+													handleCancelEdit();
+												}
+											}}
+											onClick={(e) => e.stopPropagation()}
+										/>
+										<button
+											type="button"
+											className="session-action-btn confirm-btn"
+											title="Guardar nombre (Enter)"
+											onClick={(e) => {
+												e.stopPropagation();
+												handleSaveEdit(session.id);
+											}}
+										>
+											<CheckIcon size={13} />
+										</button>
+										<button
+											type="button"
+											className="session-action-btn cancel-btn"
+											title="Cancelar (Esc)"
+											onClick={(e) => {
+												e.stopPropagation();
+												handleCancelEdit();
+											}}
+										>
+											<XIcon size={13} />
+										</button>
+									</div>
+								) : (
+									<>
+										<button
+											type="button"
+											className="session-item-main"
+											onClick={() => selectSession(session.id)}
+											style={{
+												background: "none",
+												border: "none",
+												color: "inherit",
+												cursor: "pointer",
+												textAlign: "left",
+												width: "100%",
+												padding: 0,
+											}}
+										>
+											<span className="session-item-icon">
+												<MessageSquareIcon size={15} />
+											</span>
+											<span className="session-name" title={displayName}>
+												{displayName}
+											</span>
+										</button>
+
+										<div className="session-item-actions">
+											<button
+												type="button"
+												className="session-action-btn edit-btn"
+												title="Renombrar chat"
+												onClick={(e) => handleStartEdit(session, e)}
+											>
+												<EditIcon size={13} />
+											</button>
+											<button
+												type="button"
+												className="session-action-btn"
+												title="Eliminar conversación"
+												onClick={(e) => {
+													e.stopPropagation();
+													removeSession(session.id);
+												}}
+											>
+												<TrashIcon size={14} />
+											</button>
+										</div>
+									</>
+								)}
 							</div>
-						</div>
-					))
+						);
+					})
 				)}
 			</div>
 

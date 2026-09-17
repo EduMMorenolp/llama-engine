@@ -112,6 +112,7 @@ export function ChatView() {
 		createNewSession,
 		selectSession,
 		removeSession,
+		renameSession,
 		forkSession,
 		deleteMessage,
 		loading: sessionsLoading,
@@ -130,6 +131,8 @@ export function ChatView() {
 	const [showModelMenu, setShowModelMenu] = useState(false);
 	const [selectedModelInfo, setSelectedModelInfo] = useState<ModelInfo | null>(null);
 	const [showSettings, setShowSettings] = useState(false);
+	const [tabEditingSessionId, setTabEditingSessionId] = useState<string | null>(null);
+	const [tabEditingName, setTabEditingName] = useState("");
 
 	// Load models from llama.cpp / engine-api
 	useEffect(() => {
@@ -322,26 +325,66 @@ export function ChatView() {
 
 					{/* Multi-chat Tabs */}
 					<div className="chat-tabs-bar">
-						{sessions.slice(0, 4).map((s) => (
-							<div
-								key={s.id}
-								className={`chat-tab-chip ${s.id === activeSessionId ? "active" : ""}`}
-								onClick={() => selectSession(s.id)}
-							>
-								<span>{s.name || `Chat ${s.id.slice(0, 6)}`}</span>
-								<button
-									type="button"
-									className="chat-tab-close"
-									onClick={(e) => {
+						{sessions.slice(0, 4).map((s) => {
+							const isEditingTab = tabEditingSessionId === s.id;
+							const displayName = s.name || `Chat ${s.id.slice(0, 6)}`;
+
+							return (
+								<div
+									key={s.id}
+									className={`chat-tab-chip ${s.id === activeSessionId ? "active" : ""}`}
+									onClick={() => !isEditingTab && selectSession(s.id)}
+									onDoubleClick={(e) => {
 										e.stopPropagation();
-										removeSession(s.id);
+										setTabEditingSessionId(s.id);
+										setTabEditingName(displayName);
 									}}
-									title="Cerrar pestaña"
+									title={isEditingTab ? undefined : "Doble clic para renombrar"}
 								>
-									<XIcon size={12} />
-								</button>
-							</div>
-						))}
+									{isEditingTab ? (
+										<input
+											autoFocus
+											type="text"
+											className="chat-tab-rename-input"
+											value={tabEditingName}
+											onChange={(e) => setTabEditingName(e.target.value)}
+											onClick={(e) => e.stopPropagation()}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													if (tabEditingName.trim()) {
+														renameSession(s.id, tabEditingName.trim());
+													}
+													setTabEditingSessionId(null);
+												} else if (e.key === "Escape") {
+													e.preventDefault();
+													setTabEditingSessionId(null);
+												}
+											}}
+											onBlur={() => {
+												if (tabEditingName.trim()) {
+													renameSession(s.id, tabEditingName.trim());
+												}
+												setTabEditingSessionId(null);
+											}}
+										/>
+									) : (
+										<span>{displayName}</span>
+									)}
+									<button
+										type="button"
+										className="chat-tab-close"
+										onClick={(e) => {
+											e.stopPropagation();
+											removeSession(s.id);
+										}}
+										title="Cerrar pestaña"
+									>
+										<XIcon size={12} />
+									</button>
+								</div>
+							);
+						})}
 						<button
 							type="button"
 							className="chat-tab-chip new-tab"

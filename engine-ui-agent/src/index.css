@@ -438,7 +438,35 @@ body,
 
 .session-action-btn:hover {
 	color: var(--danger);
+}
+
+.session-action-btn.edit-btn:hover {
+	color: var(--accent);
+}
+
+.session-action-btn.confirm-btn {
+	color: var(--accent);
+}
+
+.session-action-btn.confirm-btn:hover {
+	color: #10b981;
+}
+
+.session-action-btn.cancel-btn:hover {
+	color: var(--danger);
 	background: var(--danger-subtle);
+}
+
+.session-rename-input {
+	background: var(--bg-surface-active);
+	border: 1px solid var(--accent);
+	border-radius: var(--r-xs);
+	color: var(--text-primary);
+	font-size: var(--fs-sm);
+	padding: 2px 6px;
+	width: 100%;
+	outline: none;
+	box-shadow: 0 0 0 1px var(--accent);
 }
 
 .sidebar-empty {
@@ -1990,6 +2018,17 @@ button.active-glow {
 .chat-tab-chip.new-tab:hover {
 	color: var(--accent);
 	border-color: var(--accent-subtle);
+}
+
+.chat-tab-rename-input {
+	background: var(--bg-surface-active);
+	border: 1px solid var(--accent);
+	border-radius: var(--r-xs);
+	color: var(--text-primary);
+	font-size: var(--fs-xs);
+	padding: 1px 4px;
+	width: 90px;
+	outline: none;
 }
 
 /* ==========================================================================

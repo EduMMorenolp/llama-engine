@@ -6,6 +6,7 @@ import {
 	fetchSessions,
 	type Message,
 	type Session,
+	updateSession as apiUpdateSession,
 } from "../api.ts";
 
 interface SessionsContextType {
@@ -17,6 +18,7 @@ interface SessionsContextType {
 	selectSession: (id: string) => Promise<void>;
 	createNewSession: (name?: string, model?: string) => Promise<Session>;
 	removeSession: (id: string) => Promise<void>;
+	renameSession: (id: string, newName: string) => Promise<void>;
 	forkSession: (upToMessageId: string) => Promise<Session>;
 	deleteMessage: (messageId: string) => void;
 	addMessage: (msg: Message) => void;
@@ -95,6 +97,20 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 		[activeSessionId],
 	);
 
+	const renameSession = useCallback(async (id: string, newName: string) => {
+		const trimmed = newName.trim();
+		if (!trimmed) return;
+		// Optimistic update
+		setSessions((prev) =>
+			prev.map((s) => (s.id === id ? { ...s, name: trimmed, updatedAt: Date.now() } : s)),
+		);
+		try {
+			await apiUpdateSession(id, { name: trimmed });
+		} catch (err) {
+			console.warn("[sessions] Error al actualizar nombre en backend:", err);
+		}
+	}, []);
+
 	const forkSession = useCallback(
 		async (upToMessageId: string) => {
 			const active = sessions.find((s) => s.id === activeSessionId);
@@ -137,6 +153,7 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
 				selectSession,
 				createNewSession,
 				removeSession,
+				renameSession,
 				forkSession,
 				deleteMessage,
 				addMessage,
