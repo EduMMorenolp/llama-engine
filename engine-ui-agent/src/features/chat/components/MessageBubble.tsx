@@ -43,21 +43,24 @@ interface MessageBubbleProps {
 }
 
 function parseThinking(content: string): { thinking: string; rest: string } {
-	const closedMatch = content.match(/<think>([\s\S]*?)<\/think>/);
-	if (closedMatch) {
-		return {
-			thinking: closedMatch[1].trim(),
-			rest: content.replace(/<think>[\s\S]*?<\/think>/, "").trim(),
-		};
+	if (!content) return { thinking: "", rest: "" };
+
+	const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/gi;
+	const thinkings: string[] = [];
+
+	let match: RegExpExecArray | null;
+	while ((match = thinkRegex.exec(content)) !== null) {
+		if (match[1]?.trim()) {
+			thinkings.push(match[1].trim());
+		}
 	}
-	const unclosedMatch = content.match(/<think>([\s\S]*)$/);
-	if (unclosedMatch) {
-		return {
-			thinking: unclosedMatch[1].trim(),
-			rest: "",
-		};
-	}
-	return { thinking: "", rest: content };
+
+	const rest = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
+
+	return {
+		thinking: thinkings.join("\n\n"),
+		rest,
+	};
 }
 
 function CodeCopyButton({ text }: { text: string }) {
@@ -137,10 +140,9 @@ export function MessageBubble({
 	const [thinkingOpen, setThinkingOpen] = useState(true);
 
 	if (isTool) return null;
-
 	const content = message.content ?? "";
 	const { thinking, rest } = parseThinking(content);
-	const displayContent = rest || content;
+	const displayContent = rest;
 
 	// Estimate token metrics (excluding base64 payload to reflect true token count)
 	const cleanContentForMetrics = displayContent.replace(/!\[.*?\]\(data:image\/[^;]+;base64,[^)]+\)/g, "");
@@ -219,7 +221,7 @@ export function MessageBubble({
 							{thinkingOpen && (
 								<div className="thinking-body">
 									{thinking}
-									{isStreaming && !rest && <span className="streaming-cursor" />}
+									{isStreaming && !displayContent && <span className="streaming-cursor" />}
 								</div>
 							)}
 						</div>
@@ -263,91 +265,98 @@ export function MessageBubble({
 					)}
 
 					{/* Message Content */}
-					<div className={`message-content ${isUser ? "user-bubble-content" : ""}`}>
-						<div className="markdown-content">
-							<ReactMarkdown
-								remarkPlugins={[remarkGfm]}
-								urlTransform={(url) => url}
-								components={{
-									p(props) {
-										return <div className="markdown-paragraph">{props.children}</div>;
-									},
-									img(props) {
-										const { src, alt } = props;
-										if (!src) return null;
-										return (
-											<span className="attached-media-container">
-												<img
-													src={src}
-													alt={alt || "Imagen adjunta"}
-													className="attached-media-img"
-													loading="lazy"
-													onClick={() => window.open(src, "_blank")}
-													title="Ver imagen en tamaño completo"
-												/>
-												{alt && <span className="attached-media-name">{alt}</span>}
-											</span>
-										);
-									},
-									code(props) {
-										const { children, className, ...rest } = props;
-										const match = /language-(\w+)/.exec(className || "");
-										const codeString = String(children).replace(/\n$/, "");
-
-										if (match) {
+					{displayContent ? (
+						<div className={`message-content ${isUser ? "user-bubble-content" : ""}`}>
+							<div className="markdown-content">
+								<ReactMarkdown
+									remarkPlugins={[remarkGfm]}
+									urlTransform={(url) => url}
+									components={{
+										p(props) {
+											return <div className="markdown-paragraph">{props.children}</div>;
+										},
+										img(props) {
+											const { src, alt } = props;
+											if (!src) return null;
 											return (
-												<div className="code-block-wrapper">
-													<div className="code-block-header">
-														<span className="code-lang-label">{match[1]}</span>
-														<CodeCopyButton text={codeString} />
+												<span className="attached-media-container">
+													<img
+														src={src}
+														alt={alt || "Imagen adjunta"}
+														className="attached-media-img"
+														loading="lazy"
+														onClick={() => window.open(src, "_blank")}
+														title="Ver imagen en tamaño completo"
+													/>
+													{alt && <span className="attached-media-name">{alt}</span>}
+												</span>
+											);
+										},
+										code(props) {
+											const { children, className, ...rest } = props;
+											const match = /language-(\w+)/.exec(className || "");
+											const codeString = String(children).replace(/\n$/, "");
+
+											if (match) {
+												return (
+													<div className="code-block-wrapper">
+														<div className="code-block-header">
+															<span className="code-lang-label">{match[1]}</span>
+															<CodeCopyButton text={codeString} />
+														</div>
+														<SyntaxHighlighter
+															style={oneDark}
+															language={match[1]}
+															PreTag="div"
+															customStyle={{
+																margin: 0,
+																background: "#0d1017",
+																fontSize: "13px",
+																padding: "12px 14px",
+																fontFamily: "var(--font-mono)",
+																lineHeight: 1.5,
+															}}
+														>
+															{codeString}
+														</SyntaxHighlighter>
 													</div>
-													<SyntaxHighlighter
-														style={oneDark}
-														language={match[1]}
-														PreTag="div"
-														customStyle={{
-															margin: 0,
-															background: "#0d1017",
-															fontSize: "13px",
-															padding: "12px 14px",
-															fontFamily: "var(--font-mono)",
-															lineHeight: 1.5,
-														}}
-													>
-														{codeString}
-													</SyntaxHighlighter>
+												);
+											}
+											return (
+												<code className="inline-code" {...rest}>
+													{children}
+												</code>
+											);
+										},
+										a(props) {
+											const { children, href } = props;
+											return (
+												<a href={href} target="_blank" rel="noopener noreferrer">
+													{children}
+												</a>
+											);
+										},
+										table(props) {
+											return (
+												<div className="table-wrapper">
+													<table {...props} />
 												</div>
 											);
-										}
-										return (
-											<code className="inline-code" {...rest}>
-												{children}
-											</code>
-										);
-									},
-									a(props) {
-										const { children, href } = props;
-										return (
-											<a href={href} target="_blank" rel="noopener noreferrer">
-												{children}
-											</a>
-										);
-									},
-									table(props) {
-										return (
-											<div className="table-wrapper">
-												<table {...props} />
-											</div>
-										);
-									},
-								}}
-							>
-								{displayContent}
-							</ReactMarkdown>
+										},
+									}}
+								>
+									{displayContent}
+								</ReactMarkdown>
+								{isStreaming && (
+									<span className="streaming-cursor" style={{ marginLeft: "4px" }} />
+								)}
+							</div>
 						</div>
-
-						{isStreaming && <span className="streaming-cursor" />}
-					</div>
+					) : isStreaming && !thinking && parsedToolCalls.length === 0 ? (
+						<div className="message-content">
+							<span className="streaming-cursor" />
+						</div>
+					) : null}
 				</div>
 
 				{/* Message Bottom Action Bar */}

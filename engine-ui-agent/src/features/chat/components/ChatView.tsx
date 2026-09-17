@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { fetchAvailableModels, type Message, type ModelInfo } from "../../../api.ts";
 import logoImg from "../../../assets/logo.jpg";
@@ -164,22 +164,23 @@ export function ChatView() {
 		}
 	}, [showModelMenu]);
 
-	// Auto scroll to bottom smoothly
-	const scrollToBottom = useCallback(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
+	// Auto scroll desactivado (2026-09-17) — el usuario scrollea manualmente
+	// const scrollToBottom = useCallback(() => {
+	// 	messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	// }, []);
 
-	useEffect(() => {
-		const timer = setTimeout(scrollToBottom, 50);
-		return () => clearTimeout(timer);
-	}, [scrollToBottom, messages, currentContent]);
+	// Auto-scroll desactivado (2026-09-17) — el usuario scrollea manualmente
+	// useEffect(() => {
+	// 	const timer = setTimeout(scrollToBottom, 50);
+	// 	return () => clearTimeout(timer);
+	// }, [scrollToBottom, messages, currentContent]);
 
-	// Auto-scroll when new tool calls are received
-	useEffect(() => {
-		if (toolCalls.length > 0) {
-			scrollToBottom();
-		}
-	}, [scrollToBottom, messages, currentContent, toolCalls]);
+	// Auto-scroll when new tool calls are received — desactivado
+	// useEffect(() => {
+	// 	if (toolCalls.length > 0) {
+	// 		scrollToBottom();
+	// 	}
+	// }, [scrollToBottom, messages, currentContent, toolCalls]);
 
 	const handleSend = async (
 		text: string,

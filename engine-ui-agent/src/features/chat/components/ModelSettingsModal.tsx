@@ -93,37 +93,48 @@ export function ModelSettingsModal({
 	};
 
 	return createPortal(
-		<div className="modal-overlay" onClick={onClose}>
+		<div className="dialog-backdrop">
+			<button
+				type="button"
+				className="dialog-backdrop-btn"
+				onClick={onClose}
+				aria-label="Cerrar modal"
+			/>
 			<div
-				className="modal-card"
-				style={{ maxWidth: "560px", width: "100%" }}
-				onClick={(e) => e.stopPropagation()}
+				className="dialog-card"
+				style={{
+					zIndex: 1,
+					position: "relative",
+					maxWidth: "560px",
+					width: "100%",
+					maxHeight: "90vh",
+					overflowY: "auto",
+				}}
 			>
 				{/* Modal Header */}
-				<div className="modal-header">
-					<div className="modal-title-row">
-						<div className="modal-icon-badge">
-							<SlidersIcon size={18} style={{ color: "var(--accent)" }} />
-						</div>
+				<div className="dialog-title-row">
+					<div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+						<SlidersIcon size={20} style={{ color: "var(--accent)" }} />
 						<div>
-							<h3 className="modal-title">Configuración del Modelo</h3>
-							<p className="modal-subtitle">
+							<span className="dialog-title">Configuración del Modelo</span>
+							<div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
 								Parámetros de muestreo y razonamiento para {modelName || "el modelo activo"}
-							</p>
+							</div>
 						</div>
 					</div>
 					<button
 						type="button"
-						className="action-icon-btn"
+						className="session-action-btn"
 						onClick={onClose}
-						title="Cerrar (Esc)"
+						title="Cerrar modal"
+						style={{ opacity: 1 }}
 					>
-						<XIcon size={16} />
+						<XIcon size={18} />
 					</button>
 				</div>
 
 				{/* Modal Body */}
-				<div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+				<div style={{ display: "flex", flexDirection: "column", gap: "18px", marginTop: "16px" }}>
 					{/* Quick Presets */}
 					<div>
 						<label
@@ -458,12 +469,12 @@ export function ModelSettingsModal({
 
 				{/* Modal Footer */}
 				<div
-					className="modal-footer"
+					className="dialog-footer"
 					style={{
 						display: "flex",
 						justifyContent: "space-between",
 						alignItems: "center",
-						marginTop: "16px",
+						marginTop: "20px",
 					}}
 				>
 					<button
@@ -487,7 +498,7 @@ export function ModelSettingsModal({
 							style={{ display: "flex", alignItems: "center", gap: "6px" }}
 						>
 							<CheckIcon size={14} />
-							<span>Aplicar configuración</span>
+							<span>Guardar cambios</span>
 						</button>
 					</div>
 				</div>

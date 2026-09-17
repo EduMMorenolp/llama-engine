@@ -136,18 +136,22 @@ export class LLMClient {
 					yield { type: "content", data: reasoningChunk };
 				}
 
+				if (delta?.tool_calls) {
+					if (reasoningStarted && !reasoningEnded) {
+						reasoningEnded = true;
+						yield { type: "content", data: "\n</think>\n\n" };
+					}
+					for (const tc of delta.tool_calls) {
+						yield { type: "tool_call", data: tc };
+					}
+				}
+
 				if (delta?.content) {
 					if (reasoningStarted && !reasoningEnded) {
 						reasoningEnded = true;
 						yield { type: "content", data: "\n</think>\n\n" };
 					}
 					yield { type: "content", data: delta.content };
-				}
-
-				if (delta?.tool_calls) {
-					for (const tc of delta.tool_calls) {
-						yield { type: "tool_call", data: tc };
-					}
 				}
 
 				if (chunk.choices[0]?.finish_reason) {

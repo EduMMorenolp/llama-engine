@@ -17,10 +17,17 @@ services:
       - LLAMA_CTX_SIZE=${LLAMA_CTX_SIZE:-32768}
       - LLAMA_FLASH_ATTN=${LLAMA_FLASH_ATTN:-1}
       - LLAMA_CHAT_TEMPLATE=${LLAMA_CHAT_TEMPLATE:-auto}
+      # Optimización (2026-09-17)
+      - LLAMA_CACHE_TYPE_K=${LLAMA_CACHE_TYPE_K:-}
+      - LLAMA_CACHE_TYPE_V=${LLAMA_CACHE_TYPE_V:-}
+      - LLAMA_PARALLEL=${LLAMA_PARALLEL:-}
+      - LLAMA_THREADS=${LLAMA_THREADS:-}
+      - LLAMA_THREADS_BATCH=${LLAMA_THREADS_BATCH:-}
     ports:
       - "127.0.0.1:${LLAMA_HOST_PORT:-8080}:8080"
     volumes:
       - ./models:/models:ro
+      - ./llama-runtime/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - engine-network
     restart: unless-stopped

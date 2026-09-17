@@ -351,12 +351,68 @@ nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader
 
 ---
 
-## 12. Próximos pasos (plan de optimización)
+## 12. Resultados post-optimización (2026-09-17)
 
-1. **Agregar KV cache quantization** (`--cache-type-k q8_0 --cache-type-v q8_0`)
-2. **Reducir slots a 1** (`--parallel 1`)
-3. **Configurar threads** (`--threads 4 --threads-batch 4`)
-4. **Agregar variables al `.env` y `entrypoint.sh`**
-5. **Rebuild del runtime** si es necesario
-6. **Benchmark post-optimización** y comparar con este baseline
+### Cambios implementados
+
+| Archivo | Cambio |
+|---------|--------|
+| `.env` | Agregadas: `LLAMA_CACHE_TYPE_K=q8_0`, `LLAMA_CACHE_TYPE_V=q8_0`, `LLAMA_PARALLEL=1`, `LLAMA_THREADS=4`, `LLAMA_THREADS_BATCH=4`. Reducido `LLAMA_CTX_SIZE` de 32768 a 16384. |
+| `entrypoint.sh` | Agregado soporte para nuevas variables: KV cache, parallel, threads. |
+| `docker-compose.yml` | Agregadas nuevas variables de entorno + volumen para entrypoint.sh. |
+
+### Flags de llama-server (post-optimización)
+
+```
+--model /models/qwen3.5-9b.gguf
+--host 0.0.0.0
+--port 8080
+--ctx-size 16384
+--n-gpu-layers 999
+--flash-attn on
+--cache-type-k q8_0
+--cache-type-v q8_0
+--parallel 1
+--threads 4
+--threads-batch 4
+--alias qwen3.5-9b
+--no-webui
+```
+
+### Comparación de métricas
+
+| Métrica | Antes | Después | Cambio |
+|---------|-------|---------|--------|
+| VRAM usada | 6,586 MiB | 5,621 MiB | **-965 MiB (15%)** |
+| VRAM libre | 1,326 MiB | 2,291 MiB | **+965 MiB** |
+| Token generation | 43 tok/s | 45 tok/s | **+2 tok/s (+5%)** |
+| Prompt processing | 167 tok/s (avg) | 177 tok/s | **+10 tok/s (+6%)** |
+| Contexto total | 34,305 tokens | 16,384 tokens | -17,921 tokens |
+| Contexto/slot | ~8,576 tokens | 16,384 tokens | **+7,808 tokens (+91%)** |
+| Slots | 4 (1 usado) | 1 | Optimizado |
+
+### Análisis
+
+1. **VRAM liberada**: ~1 GB gracias a KV cache q8_0 y reducción de slots
+2. **Velocidad mantenida**: La generación de tokens se mantiene en ~45 tok/s
+3. **Contexto por slot mejorado**: De ~8.5K a 16K tokens por petición
+4. **Headroom para otros modelos**: Con 2.3 GB libres, ahora hay espacio para cargar modelos más pequeños o para el KV cache de Gemma 4 E4B
+
+### Pendiente
+
+- [ ] Rebuild de la imagen Docker para que el entrypoint.sh quede bakeado (el volumen mount es una solución temporal)
+- [ ] Probar con Gemma 4 E4B (multimodal) como modelo alternativo
+- [ ] Considerar `LLAMA_CTX_SIZE=32768` con q8_0 KV si se necesita más contexto
+
+---
+
+## 13. Próximos pasos
+
+1. ~~**Agregar KV cache quantization**~~ ✅ Implementado
+2. ~~**Reducir slots a 1**~~ ✅ Implementado
+3. ~~**Configurar threads**~~ ✅ Implementado
+4. ~~**Agregar variables al `.env` y `entrypoint.sh`**~~ ✅ Implementado
+5. ~~**Rebuild del runtime**~~ ✅ Recreado con volumen mount
+6. ~~**Benchmark post-optimización**~~ ✅ Completado
 7. **Probar con Gemma 4 E4B** (multimodal) como modelo alternativo
+8. **Rebuild de imagen Docker** para bakear el entrypoint.sh actualizado
