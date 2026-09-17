@@ -11,7 +11,7 @@ interface SystemPromptModalProps {
 const PRESETS = [
 	{
 		title: "Asistente General",
-		prompt: `Sos un asistente de IA experto en desarrollo de software y resolución de problemas.
+		prompt: `Sos un asistente de IA inteligente, empático y servicial.
 
 ## Comportamiento
 - Respondés con claridad, precisión y un tono profesional pero cercano.
