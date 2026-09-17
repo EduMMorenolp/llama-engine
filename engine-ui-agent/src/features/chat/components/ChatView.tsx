@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { fetchAvailableModels, type Message, type ModelInfo } from "../../../api.ts";
+import logoImg from "../../../assets/logo.jpg";
 import {
 	CheckIcon,
 	ChevronDownIcon,
@@ -437,7 +438,7 @@ export function ChatView() {
 					{messages.length === 0 && !streaming ? (
 						<div className="empty-hero">
 							<div className="hero-avatar-glow">
-								<SparklesIcon size={32} />
+								<img src={logoImg} alt="Llama Engine" className="hero-avatar-img" />
 							</div>
 							<h1 className="hero-title">¿En qué puedo ayudarte hoy?</h1>
 							<p className="hero-subtitle">
