@@ -78,44 +78,6 @@ services:
       - engine-api
     restart: unless-stopped
 
-  engine-agent:
-    build:
-      context: ./engine-agent
-      dockerfile: Dockerfile
-    container_name: engine-agent
-    environment:
-      - AGENT_PORT=3060
-      - ENGINE_API_URL=http://engine-api:3050
-      - ENGINE_API_KEY=${ENGINE_API_KEY:-llama-engine-dev}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-}
-      - DB_PATH=/data/agent.db
-    volumes:
-      - agent-data:/data
-    ports:
-      - "127.0.0.1:${AGENT_PORT:-3060}:3060"
-    networks:
-      - engine-network
-    depends_on:
-      - engine-api
-    restart: unless-stopped
-
-  engine-ui-agent:
-    build:
-      context: ./engine-ui-agent
-      dockerfile: Dockerfile
-      args:
-        - VITE_AGENT_URL=http://localhost:3060
-        - VITE_AGENT_KEY=${ENGINE_API_KEY:-llama-engine-dev}
-    container_name: engine-ui-agent
-    ports:
-      - "${AGENT_UI_PORT:-3061}:80"
-    networks:
-      - engine-network
-    depends_on:
-      - engine-agent
-    restart: unless-stopped
-
   llama-trainer:
     build:
       context: ./llama-trainer
@@ -143,5 +105,4 @@ networks:
   engine-network:
     driver: bridge
 
-volumes:
-  agent-data:
+volumes: {}
