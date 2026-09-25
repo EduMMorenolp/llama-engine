@@ -1,0 +1,3 @@
+# Asegurar LF para shell scripts (evita el bug bash\r en Docker/Linux)
+*.sh text eol=lf
+entrypoint.sh text eol=lf

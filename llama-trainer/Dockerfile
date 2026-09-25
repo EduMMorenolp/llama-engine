@@ -66,4 +66,4 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 8081
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint.sh"]

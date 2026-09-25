@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Llama-engine runtime entrypoint
-# Compone los flags de llama-server según variables de entorno y arranca.
+# Compone los flags de llama-server segun variables de entorno y arranca.
 #
 # Modelo: /models/<LLAMA_MODEL>.gguf  (id del modelo, p.ej. "qwen3.5-4b")
-# Visión: /models/mmproj-<LLAMA_MODEL>.gguf  (si existe, se pasa con --mmproj)
+# Vision: /models/mmproj-<LLAMA_MODEL>.gguf  (si existe, se pasa con --mmproj)
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ if [[ -z "$MODEL_ID" ]]; then
   exit 1
 fi
 if [[ ! -f "$MODEL_FILE" ]]; then
-  echo "No existe el modelo $MODEL_FILE. Montá los GGUFs en ./models" >&2
+  echo "No existe el modelo $MODEL_FILE. Monta los GGUFs en ./models" >&2
   exit 1
 fi
 
@@ -35,7 +35,7 @@ if [[ "$CHAT_TEMPLATE" != "auto" && -n "$CHAT_TEMPLATE" ]]; then
   ARGS+=(--chat-template "$CHAT_TEMPLATE")
 fi
 
-# --- Optimización: KV cache quantization ---
+# --- Optimizacion: KV cache quantization ---
 if [[ -n "${LLAMA_CACHE_TYPE_K:-}" ]]; then
   ARGS+=(--cache-type-k "$LLAMA_CACHE_TYPE_K")
 fi
@@ -43,12 +43,12 @@ if [[ -n "${LLAMA_CACHE_TYPE_V:-}" ]]; then
   ARGS+=(--cache-type-v "$LLAMA_CACHE_TYPE_V")
 fi
 
-# --- Optimización: parallel slots ---
+# --- Optimizacion: parallel slots ---
 if [[ -n "${LLAMA_PARALLEL:-}" ]]; then
   ARGS+=(--parallel "$LLAMA_PARALLEL")
 fi
 
-# --- Optimización: threads ---
+# --- Optimizacion: threads ---
 if [[ -n "${LLAMA_THREADS:-}" ]]; then
   ARGS+=(--threads "$LLAMA_THREADS")
 fi
