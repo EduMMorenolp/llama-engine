@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button } from "../ui/Button";
-import { getTrainJob } from "../../api";
 import type { TrainJob } from "../../api";
+import { getTrainJob } from "../../api";
+import { Button } from "../ui/Button";
 
 export function TrainingProgressStep({
 	jobId,
@@ -31,7 +31,7 @@ export function TrainingProgressStep({
 			}
 		};
 
-		poll();
+		void poll();
 		const interval = setInterval(poll, 3000);
 		return () => clearInterval(interval);
 	}, [jobId, job, onComplete]);
@@ -57,7 +57,8 @@ export function TrainingProgressStep({
 		);
 	}
 
-	const progressPct = currentJob.totalEpochs > 0 ? ((currentJob.epoch - 1) / currentJob.totalEpochs) * 100 : 0;
+	const progressPct =
+		currentJob.totalEpochs > 0 ? ((currentJob.epoch - 1) / currentJob.totalEpochs) * 100 : 0;
 	const isRunning = currentJob.status === "running" || currentJob.status === "pending";
 
 	return (
@@ -77,7 +78,9 @@ export function TrainingProgressStep({
 			</div>
 
 			<div className="progress-stats">
-				<span>Epoch {currentJob.epoch}/{currentJob.totalEpochs}</span>
+				<span>
+					Epoch {currentJob.epoch}/{currentJob.totalEpochs}
+				</span>
 				{currentJob.loss > 0 && <span>Loss: {currentJob.loss.toFixed(4)}</span>}
 				{currentJob.evalLoss !== undefined && <span>Eval: {currentJob.evalLoss.toFixed(4)}</span>}
 				<span>{currentJob.progress}%</span>
@@ -86,8 +89,10 @@ export function TrainingProgressStep({
 			<div className="training-logs">
 				<h4>Logs</h4>
 				<div className="logs-scroll">
-					{currentJob.logs.map((line, i) => (
-						<div key={i} className="log-line">{line}</div>
+					{currentJob.logs.map((line) => (
+						<div key={line} className="log-line">
+							{line}
+						</div>
 					))}
 					{currentJob.logs.length === 0 && <p className="muted">Esperando logs...</p>}
 				</div>

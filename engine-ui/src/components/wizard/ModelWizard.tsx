@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
 	type Dataset,
 	deployModel,
-	quantizeModel,
+	type QuantizeResult,
 	startTraining,
 	stopTraining,
 	type TrainingJob,
 } from "../../api";
+import { useToast } from "../../context/ToastContext";
 import { PageHeader } from "../ui/PageHeader";
 import { type BaseModelSelection, BaseModelStep } from "./BaseModelStep";
 import { DatasetStep } from "./DatasetStep";
@@ -46,6 +47,7 @@ const STEPS: Record<Flow, Step[]> = {
 
 export function ModelWizard() {
 	const navigate = useNavigate();
+	const toast = useToast();
 	const [searchParams] = useSearchParams();
 	const [flow, setFlow] = useState<Flow | null>(() => {
 		const f = searchParams.get("flow");
@@ -73,6 +75,7 @@ export function ModelWizard() {
 		outputSize: number;
 	} | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [wizardError, setWizardError] = useState<string | null>(null);
 
 	const steps = flow ? STEPS[flow] : [];
 	const totalSteps = steps.length;
@@ -85,14 +88,14 @@ export function ModelWizard() {
 			case 1:
 				return flow === "optimize" || dataset !== null;
 			case 2:
-				return flow === "optimize";
+				return flow === "optimize" || (baseModel !== null && dataset !== null);
 			default:
 				return true;
 		}
 	})();
 
 	const handleNext = async () => {
-		setCompleted((prev) => new Set([...prev, step]));
+		setWizardError(null);
 
 		if (step === 2 && (flow === "create" || flow === "improve")) {
 			setBusy(true);
@@ -109,19 +112,25 @@ export function ModelWizard() {
 					systemPrompt: config.systemPrompt,
 				});
 				setTrainJobId(data.jobId);
-			} catch {
-				// Silently handle error
-			} finally {
+				toast.info("Entrenamiento iniciado", `Job ID: ${data.jobId}`);
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				setWizardError(`No se pudo iniciar el entrenamiento: ${msg}`);
+				toast.error("Error al iniciar entrenamiento", msg);
 				setBusy(false);
+				return;
 			}
+			setBusy(false);
 		}
 
+		setCompleted((prev) => new Set([...prev, step]));
 		if (step < totalSteps - 1) {
 			setStep(step + 1);
 		}
 	};
 
 	const handleBack = () => {
+		setWizardError(null);
 		if (step > 0) setStep(step - 1);
 	};
 
@@ -134,6 +143,7 @@ export function ModelWizard() {
 		setTrainJobId(null);
 		setTrainJob(undefined);
 		setQuantizeResult(null);
+		setWizardError(null);
 	};
 
 	const handleFlowSelect = (f: Flow) => {
@@ -145,6 +155,7 @@ export function ModelWizard() {
 		setTrainJobId(null);
 		setTrainJob(undefined);
 		setQuantizeResult(null);
+		setWizardError(null);
 	};
 
 	const handleTrainingComplete = useCallback(() => {
@@ -156,36 +167,44 @@ export function ModelWizard() {
 		if (!trainJobId) return;
 		try {
 			await stopTraining(trainJobId);
-		} catch {
-			// Silently handle error
+			toast.warning("Entrenamiento detenido");
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			toast.error("No se pudo detener el entrenamiento", msg);
 		}
 	};
 
 	const handleDeploy = async (activate: boolean) => {
 		setBusy(true);
+		setWizardError(null);
 		try {
 			const modelName = `${baseModel?.id}-${quantizeResult?.method ?? config.method}`;
 			const res = await deployModel(modelName, activate);
-			if (!res.ok) return;
+			if (!res.ok) {
+				setWizardError(res.message ?? "No se pudo desplegar el modelo");
+				return;
+			}
 			setCompleted((prev) => new Set([...prev, step]));
+			toast.success("Modelo desplegado", res.message ?? `${modelName} disponible en /models`);
 			navigate("/modelos");
-		} catch {
-			// Silently handle error
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			setWizardError(`Error al desplegar: ${msg}`);
+			toast.error("Error al desplegar modelo", msg);
 		} finally {
 			setBusy(false);
 		}
 	};
 
-	const handleQuantize = async (modelId: string, method: string) => {
-		setBusy(true);
-		try {
-			const result = await quantizeModel(modelId, method);
-			setQuantizeResult({ method: result.method, outputSize: result.outputSize });
-		} catch {
-			// Silently handle error
-		} finally {
-			setBusy(false);
-		}
+	const handleQuantizeCompleted = (result: QuantizeResult, fallbackMethod: string) => {
+		setQuantizeResult({
+			method: result.method ?? fallbackMethod,
+			outputSize: result.outputSize ?? 0,
+		});
+		toast.success(
+			"Quantización iniciada / completada",
+			`Método: ${result.method ?? fallbackMethod}`,
+		);
 	};
 
 	const renderStep = () => {
@@ -200,7 +219,7 @@ export function ModelWizard() {
 						<QuantizeStep
 							modelId={baseModel?.id ?? ""}
 							modelSize={0}
-							onComplete={(result) => handleQuantize(baseModel?.id ?? "", result.method)}
+							onComplete={(result) => handleQuantizeCompleted(result, "Q4_K_M")}
 						/>
 					);
 				}
@@ -238,9 +257,7 @@ export function ModelWizard() {
 						<QuantizeStep
 							modelId={trainJobId ?? baseModel?.id ?? ""}
 							modelSize={0}
-							onComplete={(result) =>
-								handleQuantize(trainJobId ?? baseModel?.id ?? "", result.method)
-							}
+							onComplete={(result) => handleQuantizeCompleted(result, "Q4_K_M")}
 						/>
 					);
 				}
@@ -282,14 +299,26 @@ export function ModelWizard() {
 		<div className="page-stack">
 			<PageHeader
 				title="Asistente de Modelos"
-				description="Guiáte paso a paso para crear, mejorar u optimizar modelos"
+				description="Guiate paso a paso para crear, mejorar u optimizar modelos GGUF"
+				badge={flow ? `Flujo: ${flow.toUpperCase()}` : undefined}
 			/>
 
 			{!flow ? (
 				<FlowSelector selected={flow} onSelect={handleFlowSelect} />
 			) : (
-				<div className="wizard">
-					<WizardStepper steps={steps} current={step} completed={completed} />
+				<div className="wizard card">
+					<WizardStepper
+						steps={steps}
+						current={step}
+						completed={completed}
+						onStepClick={(idx) => setStep(idx)}
+					/>
+
+					{wizardError ? (
+						<div className="error" role="alert">
+							{wizardError}
+						</div>
+					) : null}
 
 					<div className="wizard-content">{renderStep()}</div>
 

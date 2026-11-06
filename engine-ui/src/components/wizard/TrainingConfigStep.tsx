@@ -158,9 +158,18 @@ export function TrainingConfigStep({
 			<div className="config-summary">
 				<h4>Estimación</h4>
 				<div className="config-stats">
-					<span>Método: <strong>{config.method.toUpperCase()}</strong></span>
-					<span>VRAM estimada: <strong>{config.method === "full" ? "60+ GB" : config.method === "lora" ? "~16 GB" : "~8 GB"}</strong></span>
-					<span>Epochs: <strong>{config.epochs}</strong></span>
+					<span>
+						Método: <strong>{config.method.toUpperCase()}</strong>
+					</span>
+					<span>
+						VRAM estimada:{" "}
+						<strong>
+							{config.method === "full" ? "60+ GB" : config.method === "lora" ? "~16 GB" : "~8 GB"}
+						</strong>
+					</span>
+					<span>
+						Epochs: <strong>{config.epochs}</strong>
+					</span>
 				</div>
 			</div>
 		</div>

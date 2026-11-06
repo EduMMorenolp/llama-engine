@@ -1,14 +1,50 @@
 import { useState } from "react";
-import { Button } from "../ui/Button";
-import { quantizeModel } from "../../api";
 import type { QuantizeResult } from "../../api";
+import { quantizeModel } from "../../api";
+import { Button } from "../ui/Button";
 
 const METHODS = [
-	{ id: "Q4_K_M", name: "Q4_K_M", bits: 4.58, size7b: "~4.3 GB", quality: "★★★★☆", recommended: true, description: "Mejor balance tamaño/calidad." },
-	{ id: "Q5_K_M", name: "Q5_K_M", bits: 5.33, size7b: "~5.0 GB", quality: "★★★★★", description: "Casi sin pérdida perceptible." },
-	{ id: "Q6_K", name: "Q6_K", bits: 6.14, size7b: "~5.8 GB", quality: "★★★★★", description: "Prácticamente sin pérdida." },
-	{ id: "Q8_0", name: "Q8_0", bits: 8.50, size7b: "~8.0 GB", quality: "★★★★★", description: "Máxima calidad." },
-	{ id: "Q3_K_M", name: "Q3_K_M", bits: 3.74, size7b: "~3.5 GB", quality: "★★★☆☆", description: "Compresión agresiva." },
+	{
+		id: "Q4_K_M",
+		name: "Q4_K_M",
+		bits: 4.58,
+		size7b: "~4.3 GB",
+		quality: "★★★★☆",
+		recommended: true,
+		description: "Mejor balance tamaño/calidad.",
+	},
+	{
+		id: "Q5_K_M",
+		name: "Q5_K_M",
+		bits: 5.33,
+		size7b: "~5.0 GB",
+		quality: "★★★★★",
+		description: "Casi sin pérdida perceptible.",
+	},
+	{
+		id: "Q6_K",
+		name: "Q6_K",
+		bits: 6.14,
+		size7b: "~5.8 GB",
+		quality: "★★★★★",
+		description: "Prácticamente sin pérdida.",
+	},
+	{
+		id: "Q8_0",
+		name: "Q8_0",
+		bits: 8.5,
+		size7b: "~8.0 GB",
+		quality: "★★★★★",
+		description: "Máxima calidad.",
+	},
+	{
+		id: "Q3_K_M",
+		name: "Q3_K_M",
+		bits: 3.74,
+		size7b: "~3.5 GB",
+		quality: "★★★☆☆",
+		description: "Compresión agresiva.",
+	},
 ];
 
 export function QuantizeStep({
@@ -74,13 +110,21 @@ export function QuantizeStep({
 					/>
 					<span>Generar imatrix (mejora calidad, +5 min)</span>
 				</label>
-				<p className="field-hint">La imatrix usa datos de calibración para mejorar quants bajo Q5_K_M</p>
+				<p className="field-hint">
+					La imatrix usa datos de calibración para mejorar quants bajo Q5_K_M
+				</p>
 			</div>
 
 			<div className="quantize-summary">
-				<span>Tamaño original: <strong>{formatBytes(modelSize)}</strong></span>
-				<span>Tamaño estimado: <strong>{estimateSize(modelSize, selectedMethod)}</strong></span>
-				<span>Reducción: <strong>{estimateReduction(selectedMethod)}%</strong></span>
+				<span>
+					Tamaño original: <strong>{formatBytes(modelSize)}</strong>
+				</span>
+				<span>
+					Tamaño estimado: <strong>{estimateSize(modelSize, selectedMethod)}</strong>
+				</span>
+				<span>
+					Reducción: <strong>{estimateReduction(selectedMethod)}%</strong>
+				</span>
 			</div>
 
 			{error && <p className="feedback feedback-error">{error}</p>}
@@ -104,14 +148,22 @@ function formatBytes(bytes: number): string {
 
 function estimateSize(inputBytes: number, method: string): string {
 	const ratios: Record<string, number> = {
-		Q3_K_M: 0.35, Q4_K_M: 0.45, Q5_K_M: 0.52, Q6_K: 0.60, Q8_0: 0.85,
+		Q3_K_M: 0.35,
+		Q4_K_M: 0.45,
+		Q5_K_M: 0.52,
+		Q6_K: 0.6,
+		Q8_0: 0.85,
 	};
 	return formatBytes(inputBytes * (ratios[method] ?? 0.45));
 }
 
 function estimateReduction(method: string): number {
 	const ratios: Record<string, number> = {
-		Q3_K_M: 0.35, Q4_K_M: 0.45, Q5_K_M: 0.52, Q6_K: 0.60, Q8_0: 0.85,
+		Q3_K_M: 0.35,
+		Q4_K_M: 0.45,
+		Q5_K_M: 0.52,
+		Q6_K: 0.6,
+		Q8_0: 0.85,
 	};
 	return Math.round((1 - (ratios[method] ?? 0.45)) * 100);
 }

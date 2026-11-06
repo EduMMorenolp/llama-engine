@@ -65,11 +65,7 @@ export function DeployStep({
 			</div>
 
 			<label className="checkbox-label">
-				<input
-					type="checkbox"
-					checked={activate}
-					onChange={(e) => setActivate(e.target.checked)}
-				/>
+				<input type="checkbox" checked={activate} onChange={(e) => setActivate(e.target.checked)} />
 				<span>Activar como modelo principal</span>
 			</label>
 

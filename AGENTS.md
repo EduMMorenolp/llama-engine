@@ -59,6 +59,7 @@ Los builds de CUDA pueden tardar varios minutos y requieren Docker con soporte N
 - Mantené los cambios quirúrgicos y actualizá la documentación directamente relacionada.
 - No confirmes `.env`, credenciales, tokens, datasets privados ni archivos `.gguf`.
 - No modifiques archivos generados (`dist/`, builds de Vite o dependencias instaladas).
+- Mantener actualizado el CHANGELOG.md y `docs/` cuando se hagan cambios. 
 
 ## Docker y modelos
 

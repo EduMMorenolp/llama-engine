@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 
 export interface ChangelogEntry {
 	version: string;
@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+	{
+		version: "0.4.0",
+		date: "2026-11-06",
+		title: "Rediseño integral UI/UX, Playground Multimodal y Command Palette",
+		items: [
+			"Nuevo Playground Multimodal (/playground): chat en tiempo real con streaming SSE (/v1/chat/completions), soporte de imágenes base64 (mmproj), métricas tok/s por respuesta y exportación a JSONL.",
+			"RuntimeContext compartido: elimina el polling duplicado, preserva el historial de telemetría entre pantallas y permite pausar o cambiar la frecuencia de actualización (3s/5s/10s).",
+			"Paleta de comandos global (Ctrl+K) para navegar, cambiar de modelo GGUF en un clic y controlar el contenedor runtime.",
+			"Sistema de notificaciones Toast, diálogos de confirmación (ConfirmDialog) y soporte completo para Modo Oscuro y Modo Claro.",
+			"Visor de logs interactivo en Runtime con búsqueda en vivo, filtro por nivel, resaltado sintáctico, copia y descarga .log.",
+			"Estimador de uso de VRAM en Modelos, filtros por capacidad (Visión/Texto), tabla de slots en Telemetría y generador de snippets API en Ayuda.",
+		],
+	},
 	{
 		version: "0.3.0",
 		date: "2026-09-15",
@@ -69,25 +82,31 @@ export const MANUAL: ManualSection[] = [
 			{
 				heading: "Dashboard",
 				body: [
-					"Métricas clave del motor: salud del runtime, modelo cargado, throughput total, uptime de la API, modelos registrados y un panel GPU compacto. Se actualiza solo cada 3 segundos.",
+					"Centro de control ejecutivo: salud del runtime, modelo activo, velocidad de generación y prompt (tok/s), uso de VRAM, gráfico rápido de rendimiento y cambio directo de modelo.",
 				],
 			},
 			{
-				heading: "Modelos",
+				heading: "Playground",
 				body: [
-					"Registry de modelos GGUF con selector de modelo, contexto (ctx) y recarga. Tabla de detalle por modelo y botones de reinicio del runtime.",
+					"Estudio interactivo de chat e inferencia multimodal conectado a /v1/chat/completions con streaming SSE. Permite adjuntar imágenes para modelos con visión (mmproj), ajustar temperatura/system prompt y exportar conversaciones como dataset JSONL.",
 				],
 			},
 			{
-				heading: "Runtime",
+				heading: "Modelos GGUF",
 				body: [
-					"Configuración efectiva del motor (engine + runtimeEnv), controles Reiniciar/Stop/Start y vista de logs con tail configurable.",
+					"Registry de modelos locales con filtros por capacidad (visión/texto), estimación de encaje en VRAM, presets de contexto (4K a 64K) y explorador integrado de Hugging Face Hub.",
+				],
+			},
+			{
+				heading: "Runtime & Logs",
+				body: [
+					"Configuración efectiva del motor (engine + runtimeEnv), controles seguros con confirmación (Reiniciar/Stop/Start) y consola de logs con filtro en vivo y descarga.",
 				],
 			},
 			{
 				heading: "Telemetría",
 				body: [
-					"Specs del sistema (versión, uptime, modelo), panel GPU detallado (VRAM, temperatura, potencia, uso) y gráfico de historial de tok/s acumulado durante la sesión.",
+					"Gráficos de sesión (generación tok/s, prompt tok/s, utilización GPU y temperatura), tabla de slots concurrentes de llama-server y eficiencia energética (tok/s por Watt).",
 				],
 			},
 			{
@@ -106,8 +125,10 @@ export const MANUAL: ManualSection[] = [
 				],
 			},
 			{
-				heading: "Ayuda",
-				body: ["Esta página: historial de versiones y manual de uso."],
+				heading: "Ayuda & API",
+				body: [
+					"Esta página: generador de snippets listos para copiar (cURL, Python, TypeScript, opencode, Hermes), atajos de teclado, historial de versiones y manual de uso.",
+				],
 			},
 		],
 	},
@@ -134,12 +155,12 @@ export const MANUAL: ManualSection[] = [
 		],
 	},
 	{
-		title: "Integración con opencode",
+		title: "Integración con opencode y Hermes",
 		blocks: [
 			{
 				body: [
-					'Podés usar llama-engine como proveedor de modelos local. Registrá el proveedor "llama" (baseURL http://localhost:3050/v1) en tu opencode.json y seleccioná el modelo, por ejemplo: opencode --model llama/qwen3.5-4b.',
-					"Detalle completo en docs/INTEGRACION-OPENCODE.md.",
+					"Podés usar llama-engine como proveedor de modelos local en opencode y Hermes Agent apuntando baseURL a http://localhost:3050/v1.",
+					"Detalle completo en docs/INTEGRACION-OPENCODE.md y docs/INTEGRACION-HERMES.md.",
 				],
 			},
 		],
@@ -149,7 +170,7 @@ export const MANUAL: ManualSection[] = [
 		blocks: [
 			{
 				body: [
-					"Desde la pantalla Modelos seleccionás el modelo GGUF y su contexto (ctx) y pulsás Recargar. El runtime recarga el modelo elegido sin reiniciar el contenedor.",
+					"Desde la pantalla Modelos (o con Ctrl+K desde cualquier lugar) seleccionás el modelo GGUF y su contexto (ctx) y pulsás Recargar.",
 					"Equivalente por HTTP con la API key:",
 					"curl -X POST http://localhost:3050/api/models/reload \\",
 					'  -H "x-api-key: TU_API_KEY" -H "Content-Type: application/json" \\',
@@ -163,8 +184,7 @@ export const MANUAL: ManualSection[] = [
 		blocks: [
 			{
 				body: [
-					"Copiá un GGUF a la carpeta models/ con la convención <id>.gguf y, si tiene visión, mmproj-<id>.gguf. El registro lo detecta automáticamente al reiniciar el servicio.",
-					"Ver docs/INSTALL.md para descargar y montar modelos.",
+					"Descargá directamente desde la sección Hugging Face en la pantalla Modelos, o copiá un GGUF a la carpeta models/ con la convención <id>.gguf y, si tiene visión, mmproj-<id>.gguf.",
 				],
 			},
 		],
@@ -202,15 +222,7 @@ export const MANUAL: ManualSection[] = [
 				body: [
 					"Comprimí un modelo existente eligiendo el método de cuantización deseado.",
 					"Opciones: Q3_K_M (más compacto), Q4_K_M (recomendado), Q5_K_M, Q6_K, Q8_0 (mayor calidad).",
-					"Opcional: usar imagen de calibración (imatrix) para mejor preservación de calidad.",
-				],
-			},
-			{
-				heading: "Servicio llama-trainer",
-				body: [
-					"El entrenamiento corre en un contenedor Docker separado (llama-trainer) con GPU dedicada.",
-					"API interna en http://localhost:8081 con endpoints para datasets, entrenamiento y quantización.",
-					"Los modelos entrenados se exportan a GGUF y se montan automáticamente en /models.",
+					"Opcional: usar matriz de importancia (imatrix) para mejor preservación de calidad.",
 				],
 			},
 		],
@@ -225,8 +237,7 @@ export const MANUAL: ManualSection[] = [
 					"· GPU no disponible: revisá que nvidia-container-toolkit esté instalado y que la opción runtime: nvidia esté activa.",
 					"· Primer prompt lento: es el warmup del modelo; con GGUF cuantizado (p.ej. Q4_K_M) es más rápido.",
 					"· Trainer no responde: verificá que el contenedor llama-trainer esté corriendo con docker compose ps.",
-					"· Error 'No module named trainer': reconstruí el contenedor con docker compose build llama-trainer.",
-					"· GPU insuficiente para entrenamiento: QLoRA requiere ~6 GB VRAM para modelos 7B; reduce batch_size o max_seq_len.",
+					"· GPU insuficiente para entrenamiento: QLoRA requiere ~6-8 GB VRAM para modelos 4B-7B; reducí batch_size o max_seq_len.",
 				],
 			},
 		],

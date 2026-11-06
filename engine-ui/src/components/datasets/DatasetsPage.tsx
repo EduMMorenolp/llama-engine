@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	type Dataset,
@@ -9,18 +9,25 @@ import {
 	type ValidationResult,
 	validateDataset,
 } from "../../api";
+import { useToast } from "../../context/ToastContext";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { fmtBytes, fmtCount } from "../ui/helpers";
+import { IconCheck, IconDatabase, IconEye, IconSparkles, IconTrash } from "../ui/Icons";
 import { PageHeader, PageSection } from "../ui/PageHeader";
 import { EmptyState, ErrorState, Loading } from "../ui/states";
 import { DatasetDropzone } from "./DatasetDropzone";
 
 export function DatasetsPage() {
 	const navigate = useNavigate();
+	const toast = useToast();
 	const [datasets, setDatasets] = useState<Dataset[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
+
+	const [search, setSearch] = useState("");
+	const [formatFilter, setFormatFilter] = useState<string>("all");
 
 	const [validations, setValidations] = useState<Record<string, ValidationResult>>({});
 	const [previews, setPreviews] = useState<Record<string, DatasetPreview>>({});
@@ -40,12 +47,36 @@ export function DatasetsPage() {
 	}, []);
 
 	useEffect(() => {
-		load();
+		void load();
 	}, [load]);
 
+	const filtered = useMemo(() => {
+		const q = search.trim().toLowerCase();
+		return datasets.filter((d) => {
+			if (formatFilter !== "all" && d.format.toLowerCase() !== formatFilter.toLowerCase()) {
+				return false;
+			}
+			if (q && !d.name.toLowerCase().includes(q) && !d.id.toLowerCase().includes(q)) {
+				return false;
+			}
+			return true;
+		});
+	}, [datasets, search, formatFilter]);
+
+	const totalExamples = useMemo(
+		() => datasets.reduce((acc, d) => acc + (d.examples || 0), 0),
+		[datasets],
+	);
+	const totalBytes = useMemo(
+		() => datasets.reduce((acc, d) => acc + (d.sizeBytes || 0), 0),
+		[datasets],
+	);
+
 	const handleUploaded = (ds: Dataset) => {
-		setNotice(`Dataset "${ds.name}" subido (${fmtCount(ds.examples)} ejemplos)`);
-		load();
+		const msg = `Dataset "${ds.name}" subido (${fmtCount(ds.examples)} ejemplos)`;
+		setNotice(msg);
+		toast.success("Dataset subido", msg);
+		void load();
 	};
 
 	const handleValidate = async (id: string) => {
@@ -54,21 +85,38 @@ export function DatasetsPage() {
 		try {
 			const res = await validateDataset(id);
 			setValidations((prev) => ({ ...prev, [id]: res }));
+			if (res.valid) {
+				toast.success("Dataset válido", `${res.format} · ${res.examples} ejemplos`);
+			} else {
+				toast.warning("Dataset con observaciones", `${res.errors.length} error(es) detectados`);
+			}
 		} catch (err) {
-			setNotice(err instanceof Error ? err.message : String(err));
+			const msg = err instanceof Error ? err.message : String(err);
+			setNotice(msg);
+			toast.error("Error al validar", msg);
 		} finally {
 			setBusyRow(null);
 		}
 	};
 
 	const handlePreview = async (id: string) => {
+		if (previews[id]) {
+			setPreviews((prev) => {
+				const copy = { ...prev };
+				delete copy[id];
+				return copy;
+			});
+			return;
+		}
 		setBusyRow(id);
 		setNotice(null);
 		try {
-			const res = await previewDataset(id);
+			const res = await previewDataset(id, 6);
 			setPreviews((prev) => ({ ...prev, [id]: res }));
 		} catch (err) {
-			setNotice(err instanceof Error ? err.message : String(err));
+			const msg = err instanceof Error ? err.message : String(err);
+			setNotice(msg);
+			toast.error("Error al previsualizar", msg);
 		} finally {
 			setBusyRow(null);
 		}
@@ -81,9 +129,13 @@ export function DatasetsPage() {
 			await deleteDataset(id);
 			setConfirmId(null);
 			setDatasets((prev) => prev.filter((d) => d.id !== id));
-			setNotice(`Dataset "${id}" eliminado`);
+			const msg = `Dataset "${id}" eliminado`;
+			setNotice(msg);
+			toast.info("Dataset eliminado", msg);
 		} catch (err) {
-			setNotice(err instanceof Error ? err.message : String(err));
+			const msg = err instanceof Error ? err.message : String(err);
+			setNotice(msg);
+			toast.error("No se pudo eliminar", msg);
 		} finally {
 			setBusyRow(null);
 		}
@@ -100,10 +152,29 @@ export function DatasetsPage() {
 		<div className="page-stack">
 			<PageHeader
 				title="DataSets"
-				description="Biblioteca de datasets de entrenamiento (ShareGPT, OpenAI, Alpaca)"
+				description="Biblioteca de datasets de entrenamiento en formato JSONL (ShareGPT, OpenAI, Alpaca)"
+				badge={`${datasets.length} archivos · ${fmtCount(totalExamples)} ejemplos`}
 			/>
 
-			<PageSection title="Subir dataset">
+			<div className="metric-tiles">
+				<div className="metric-tile">
+					<span className="metric-label">Datasets en biblioteca</span>
+					<span className="metric-value">{datasets.length}</span>
+				</div>
+				<div className="metric-tile">
+					<span className="metric-label">Ejemplos totales</span>
+					<span className="metric-value">{fmtCount(totalExamples)}</span>
+				</div>
+				<div className="metric-tile">
+					<span className="metric-label">Espacio en disco</span>
+					<span className="metric-value metric-value-text">{fmtBytes(totalBytes)}</span>
+				</div>
+			</div>
+
+			<PageSection
+				title="Subir dataset"
+				subtitle="Arrastrá archivos .jsonl o .json para incorporarlos a llama-trainer"
+			>
 				<DatasetDropzone onUploaded={handleUploaded} />
 				{notice ? (
 					<p className="feedback feedback-ok" role="status">
@@ -112,12 +183,47 @@ export function DatasetsPage() {
 				) : null}
 			</PageSection>
 
-			<PageSection title={`Biblioteca (${datasets.length})`}>
-				{datasets.length === 0 ? (
-					<EmptyState message="Todavía no hay datasets. Subí tu primer .jsonl arriba." />
+			<PageSection
+				title={`Biblioteca (${filtered.length})`}
+				subtitle="Validá la estructura de tus conversaciones o iniciá un job de fine-tuning directo"
+				actions={
+					datasets.length > 0 ? (
+						<div className="table-filter-bar">
+							<input
+								type="search"
+								className="input-sm"
+								placeholder="Buscar dataset…"
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+							/>
+							<select
+								className="select-sm"
+								aria-label="Filtrar por formato"
+								value={formatFilter}
+								onChange={(e) => setFormatFilter(e.target.value)}
+							>
+								<option value="all">Todos los formatos</option>
+								<option value="ShareGPT">ShareGPT</option>
+								<option value="OpenAI">OpenAI</option>
+								<option value="Alpaca">Alpaca</option>
+							</select>
+						</div>
+					) : undefined
+				}
+			>
+				{filtered.length === 0 ? (
+					<EmptyState
+						icon={<IconDatabase size={28} />}
+						title="Sin datasets en esta vista"
+						message={
+							datasets.length === 0
+								? "Todavía no hay datasets. Subí tu primer .jsonl arriba."
+								: "Ningún dataset coincide con el filtro."
+						}
+					/>
 				) : (
 					<ul className="dataset-library">
-						{datasets.map((d) => {
+						{filtered.map((d) => {
 							const validation = validations[d.id];
 							const preview = previews[d.id];
 							const busy = busyRow === d.id;
@@ -125,42 +231,56 @@ export function DatasetsPage() {
 								<li key={d.id} className="dataset-card">
 									<div className="dataset-card-head">
 										<div className="dataset-card-info">
-											<h3 className="dataset-card-title">{d.name}</h3>
+											<div className="dataset-title-row">
+												<h3 className="dataset-card-title mono">{d.name}</h3>
+												<span className="badge badge-muted">{d.format}</span>
+											</div>
 											<p className="muted">
-												{d.id} · {d.format} · {fmtCount(d.examples)} ejemplos ·{" "}
+												ID: <span className="mono">{d.id}</span> · {fmtCount(d.examples)} ejemplos ·{" "}
 												{fmtBytes(d.sizeBytes)}
 											</p>
 										</div>
 										<div className="dataset-card-actions">
-											<Button variant="ghost" busy={busy} onClick={() => handleValidate(d.id)}>
-												Validar
+											<Button
+												variant="ghost"
+												size="sm"
+												busy={busy}
+												onClick={() => handleValidate(d.id)}
+											>
+												<IconCheck size={14} />
+												<span>Validar</span>
 											</Button>
-											<Button variant="ghost" busy={busy} onClick={() => handlePreview(d.id)}>
-												Previsualizar
+											<Button
+												variant="ghost"
+												size="sm"
+												busy={busy}
+												onClick={() => handlePreview(d.id)}
+											>
+												<IconEye size={14} />
+												<span>{preview ? "Ocultar preview" : "Previsualizar"}</span>
 											</Button>
-											<Button onClick={() => handleTrain(d.id, "create")}>Crear modelo</Button>
-											<Button onClick={() => handleTrain(d.id, "improve")}>Mejorar modelo</Button>
-											{confirmId === d.id ? (
-												<>
-													<Button variant="danger" busy={busy} onClick={() => handleDelete(d.id)}>
-														Confirmar
-													</Button>
-													<Button variant="ghost" onClick={() => setConfirmId(null)}>
-														Cancelar
-													</Button>
-												</>
-											) : (
-												<Button variant="danger" onClick={() => setConfirmId(d.id)}>
-													Borrar
-												</Button>
-											)}
+											<Button
+												size="sm"
+												variant="primary"
+												onClick={() => handleTrain(d.id, "create")}
+											>
+												<IconSparkles size={14} />
+												<span>Crear modelo</span>
+											</Button>
+											<Button size="sm" onClick={() => handleTrain(d.id, "improve")}>
+												Mejorar modelo
+											</Button>
+											<Button variant="danger" size="sm" onClick={() => setConfirmId(d.id)}>
+												<IconTrash size={14} />
+												<span>Borrar</span>
+											</Button>
 										</div>
 									</div>
 
 									{validation ? (
 										<div className={`dataset-validation ${validation.valid ? "ok" : "bad"}`}>
-											<span className={`badge ${validation.valid ? "badge-on" : "badge-muted"}`}>
-												{validation.valid ? "válido" : "con errores"}
+											<span className={`badge ${validation.valid ? "badge-on" : "badge-warn"}`}>
+												{validation.valid ? "✓ válido" : "⚠ con errores"}
 											</span>
 											<span className="muted">
 												{validation.format} · {fmtCount(validation.examples)} ejemplos
@@ -181,13 +301,13 @@ export function DatasetsPage() {
 											<div className="dataset-preview-scroll">
 												{preview.examples.map((ex) => (
 													<div
-														key={`${d.id}-${ex.role}-${ex.content.slice(0, 40)}`}
+														key={`${d.id}-${ex.role}-${ex.content.slice(0, 48)}`}
 														className="dataset-preview-item"
 													>
 														<span className={`preview-role ${ex.role}`}>{ex.role}:</span>
 														<span className="preview-content">
-															{ex.content.slice(0, 200)}
-															{ex.content.length > 200 ? "..." : ""}
+															{ex.content.slice(0, 240)}
+															{ex.content.length > 240 ? "…" : ""}
 														</span>
 													</div>
 												))}
@@ -200,6 +320,18 @@ export function DatasetsPage() {
 					</ul>
 				)}
 			</PageSection>
+
+			<ConfirmDialog
+				open={confirmId !== null}
+				title="Eliminar dataset"
+				description={`¿Seguro que querés eliminar el dataset "${confirmId}" del almacenamiento de llama-trainer? Esta acción no se puede deshacer.`}
+				confirmLabel="Eliminar definitivamente"
+				busy={busyRow === confirmId}
+				onCancel={() => setConfirmId(null)}
+				onConfirm={() => {
+					if (confirmId) void handleDelete(confirmId);
+				}}
+			/>
 		</div>
 	);
 }

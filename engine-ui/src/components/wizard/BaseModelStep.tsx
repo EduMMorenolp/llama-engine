@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { searchHf, type HubModel, fetchHfRepo } from "../../api";
+import { fetchHfRepo, type HubModel, searchHf } from "../../api";
 import { useRuntime } from "../../hooks/useRuntime";
 import { Button } from "../ui/Button";
 import { fmtBytes, fmtCount } from "../ui/helpers";
@@ -104,21 +104,25 @@ export function BaseModelStep({
 					{results.length > 0 && (
 						<ul className="hf-results-list">
 							{results.map((m) => (
-								<li
-									key={m.id}
-									className={`hf-result-item ${value?.id === m.id ? "selected" : ""}`}
-									onClick={() => selectHfModel(m)}
-									onKeyDown={(e) => e.key === "Enter" && selectHfModel(m)}
-									role="button"
-									tabIndex={0}
-								>
-									<div className="hf-result-info">
-										<span className="hf-result-id">{m.id}</span>
-										<span className="hf-result-meta">
-											{fmtCount(m.downloads)} descargas · {fmtCount(m.likes)} likes
+								<li key={m.id} className={`hf-result-item ${value?.id === m.id ? "selected" : ""}`}>
+									<button
+										type="button"
+										className="selectable-row-btn"
+										onClick={() => selectHfModel(m)}
+									>
+										<span className="hf-result-info">
+											<span className="hf-result-id">{m.id}</span>
+											<span className="hf-result-meta">
+												{fmtCount(m.downloads)} descargas · {fmtCount(m.likes)} likes
+											</span>
 										</span>
-									</div>
-									<Button variant="ghost" onClick={(e) => { e.stopPropagation(); openDetail(m); }} busy={loadingDetail}>
+									</button>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => openDetail(m)}
+										busy={loadingDetail}
+									>
 										Detalles
 									</Button>
 								</li>
@@ -135,23 +139,25 @@ export function BaseModelStep({
 			{tab === "local" && (
 				<div className="local-panel">
 					{registry.length === 0 ? (
-						<p className="muted">No hay modelos locales en /models. Subí GGUFs o descargá desde HuggingFace.</p>
+						<p className="muted">
+							No hay modelos locales en /models. Subí GGUFs o descargá desde HuggingFace.
+						</p>
 					) : (
 						<ul className="local-models-list">
 							{registry.map((m) => (
-								<li
-									key={m.id}
-									className={`local-model-item ${value?.id === m.id ? "selected" : ""}`}
-									onClick={() => selectLocalModel(m)}
-									onKeyDown={(e) => e.key === "Enter" && selectLocalModel(m)}
-									role="button"
-									tabIndex={0}
-								>
-									<span className="local-model-id">{m.id}</span>
-									<span className="local-model-meta">
-										{m.vision ? "vision · " : ""}{fmtBytes(m.sizeBytes)}
-									</span>
-									{m.id === status?.loadedModel && <span className="model-tag">cargado</span>}
+								<li key={m.id}>
+									<button
+										type="button"
+										className={`local-model-item ${value?.id === m.id ? "selected" : ""}`}
+										onClick={() => selectLocalModel(m)}
+									>
+										<span className="local-model-id">{m.id}</span>
+										<span className="local-model-meta">
+											{m.vision ? "vision · " : ""}
+											{fmtBytes(m.sizeBytes)}
+										</span>
+										{m.id === status?.loadedModel && <span className="model-tag">cargado</span>}
+									</button>
 								</li>
 							))}
 						</ul>

@@ -12,14 +12,16 @@ const FLOWS: FlowOption[] = [
 		icon: "🆕",
 		title: "Crear modelo",
 		description: "Entrená un modelo desde cero con tu propio dataset",
-		detail: "Elegí un modelo base, subí tus datos y entrená un modelo personalizado con QLoRA/LoRA.",
+		detail:
+			"Elegí un modelo base, subí tus datos y entrená un modelo personalizado con QLoRA/LoRA.",
 	},
 	{
 		id: "improve",
 		icon: "📈",
 		title: "Mejorar modelo",
 		description: "Ajustá un modelo existente con nuevos ejemplos",
-		detail: "Seleccioná un modelo registrado y fine-tunelo con datos de corrección o ejemplos adicionales.",
+		detail:
+			"Seleccioná un modelo registrado y fine-tunelo con datos de corrección o ejemplos adicionales.",
 	},
 	{
 		id: "optimize",

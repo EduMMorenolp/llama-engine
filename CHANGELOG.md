@@ -24,6 +24,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
+- **engine-ui**: Rediseño integral UI/UX (v0.4.0):
+  - Nuevo **Playground Multimodal** (`/playground`) con chat streaming SSE (`/v1/chat/completions`), soporte de imágenes en base64 para modelos con visión (`mmproj`), control de parámetros (`Temperature`, `Top-P`, `Max Tokens`, `System Prompt`), métricas `tok/s` en vivo y exportación a `.jsonl`.
+  - **RuntimeContext compartido**: elimina el polling duplicado entre `Layout` y vistas hijas, conserva el historial de telemetría (`tok/s`, prompt `tok/s`, uso y temperatura GPU) durante toda la sesión y agrega selector de frecuencia (`3s`, `5s`, `10s`, pausa).
+  - **Command Palette (`Ctrl+K`)**: búsqueda rápida de pantallas, cambio de modelo GGUF activo y acciones del runtime.
+  - **Sistema de diseño**: soporte para Modo Oscuro y Modo Claro (`ThemeProvider`), sistema de notificaciones `ToastProvider`, diálogos de confirmación (`ConfirmDialog`), `ErrorBoundary` e iconografía vectorial SVG (`Icons.tsx`).
+  - **Mejoras por pantalla**: Hero banner y mini-chart en Dashboard; filtros, ordenamiento, presets de contexto y estimador de VRAM en Modelos; visor de logs con búsqueda, filtro de severidad, copia y descarga `.log` en Runtime; doble gráfica y tabla de slots en Telemetría; generador de snippets API (`cURL`, `Python`, `TypeScript`, `opencode`, `Hermes`) y buscador en Ayuda.
+  - Corrección de todos los errores de Biome/accesibilidad y de la doble invocación de quantización en `ModelWizard`.
+- **docs**: Nuevo reporte de auditoría y mejoras integrales en [`docs/updates/ANALISIS_Y_REPORTE_MEJORAS.md`](./docs/updates/ANALISIS_Y_REPORTE_MEJORAS.md).
 - **docs**: Nueva guía [`docs/INTEGRACION-HERMES.md`](./docs/INTEGRACION-HERMES.md) para usar el motor como proveedor local de **Hermes Agent** (bloque `providers:` + `model_aliases:` en `config.yaml`), con selección vía `--provider`/`/model`, notas de thinking/tool-calling y troubleshooting.
 - **engine-agent** (nuevo servicio de agente autónomo):
   - Bucle de razonamiento interactivo y ejecución autónoma de herramientas (`src/agent/loop.ts`).

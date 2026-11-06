@@ -55,7 +55,7 @@ export interface RuntimeEngineConfig {
 	runtimeUrl?: string;
 	runtimeContainer?: string;
 	modelsDir?: string;
-	rateLimit?: number | string;
+	rateLimit?: number | string | { enabled: boolean; windowMs: number; max: number };
 }
 
 export interface RuntimeConfig {
@@ -285,10 +285,12 @@ export interface QuantizeMethod {
 }
 
 export interface QuantizeResult {
+	jobId?: string;
+	status?: string;
 	method: string;
-	inputPath: string;
-	outputPath: string;
-	inputSize: number;
+	inputPath?: string;
+	outputPath?: string;
+	inputSize?: number;
 	outputSize: number;
 }
 
@@ -311,4 +313,87 @@ export async function quantizeModel(
 
 export async function deployModel(modelName: string, activate: boolean): Promise<ActionResult> {
 	return post("/api/models/deploy", { modelName, activate });
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI-compatible Playground (/v1/chat/completions)
+// ---------------------------------------------------------------------------
+
+export type ChatContentPart =
+	| { type: "text"; text: string }
+	| { type: "image_url"; image_url: { url: string } };
+
+export interface ChatMessagePayload {
+	role: "system" | "user" | "assistant";
+	content: string | ChatContentPart[];
+}
+
+export interface ChatCompletionOptions {
+	model: string;
+	messages: ChatMessagePayload[];
+	temperature?: number;
+	topP?: number;
+	maxTokens?: number;
+	signal?: AbortSignal;
+	onToken: (delta: string) => void;
+}
+
+export async function streamChatCompletion(opts: ChatCompletionOptions): Promise<void> {
+	const res = await fetch(`${API_URL}/v1/chat/completions`, {
+		method: "POST",
+		headers: {
+			"x-api-key": API_KEY,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			model: opts.model,
+			messages: opts.messages,
+			stream: true,
+			temperature: opts.temperature ?? 0.7,
+			top_p: opts.topP ?? 0.9,
+			max_tokens: opts.maxTokens ?? 1024,
+		}),
+		signal: opts.signal,
+	});
+
+	if (!res.ok) {
+		const errText = await res.text().catch(() => "");
+		throw new Error(`HTTP ${res.status}${errText ? `: ${errText.slice(0, 140)}` : ""}`);
+	}
+
+	if (!res.body) {
+		throw new Error("El servidor no devolvió un stream de respuesta");
+	}
+
+	const reader = res.body.getReader();
+	const decoder = new TextDecoder("utf-8");
+	let buffer = "";
+
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		buffer += decoder.decode(value, { stream: true });
+		const lines = buffer.split("\n");
+		buffer = lines.pop() ?? "";
+
+		for (const rawLine of lines) {
+			const line = rawLine.trim();
+			if (!line?.startsWith("data:")) continue;
+			const payload = line.slice(5).trim();
+			if (payload === "[DONE]") return;
+			try {
+				const parsed = JSON.parse(payload) as {
+					choices?: Array<{
+						delta?: { content?: string; reasoning_content?: string };
+						message?: { content?: string };
+					}>;
+				};
+				const choice = parsed.choices?.[0];
+				const piece = choice?.delta?.content ?? choice?.message?.content ?? "";
+				if (piece) opts.onToken(piece);
+			} catch {
+				// Ignore partial JSON lines
+			}
+		}
+	}
 }
