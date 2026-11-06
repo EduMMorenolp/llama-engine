@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ActionResult, RegisteredModel } from "../api";
+import type { ActionResult, RegisteredModel, ReloadOptions } from "../api";
 import { reloadModel, restartRuntime, startRuntime, stopRuntime } from "../api";
 import { useToast } from "../context/ToastContext";
 
@@ -9,7 +9,7 @@ export interface ModelActions {
 	busyAction: BusyAction;
 	error: string | null;
 	message: string | null;
-	reload: (modelId: string, ctxSize?: number) => void;
+	reload: (modelId: string, opts?: number | ReloadOptions) => void;
 	restart: () => void;
 	stop: () => void;
 	start: () => void;

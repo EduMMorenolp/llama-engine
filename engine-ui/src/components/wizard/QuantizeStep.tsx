@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { QuantizeResult } from "../../api";
-import { quantizeModel } from "../../api";
+import { getQuantizeJob, quantizeModel } from "../../api";
 import { Button } from "../ui/Button";
 
 const METHODS = [
@@ -65,7 +65,21 @@ export function QuantizeStep({
 		setQuantizing(true);
 		setError(null);
 		try {
-			const result = await quantizeModel(modelId, selectedMethod, useImatrix);
+			let result = await quantizeModel(modelId, selectedMethod, useImatrix);
+			const jobId = result.jobId ?? result.id;
+			if (jobId && result.status === "running") {
+				while (true) {
+					await new Promise((r) => setTimeout(r, 1500));
+					const job = await getQuantizeJob(jobId);
+					if (job.status === "completed") {
+						result = { ...job, method: job.method ?? selectedMethod };
+						break;
+					}
+					if (job.status === "failed") {
+						throw new Error(job.error ?? "Fallo durante la quantización");
+					}
+				}
+			}
 			onComplete(result);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Error desconocido");

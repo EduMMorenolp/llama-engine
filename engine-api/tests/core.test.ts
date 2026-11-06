@@ -2,11 +2,19 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { buildConfig } from "../src/config.js";
+import type { Env } from "../src/env.js";
+import { sanitizeFile } from "../src/hub/hf.js";
 import { createAuthMiddleware } from "../src/middleware/auth.js";
 import { ModelRegistry } from "../src/models/registry.js";
 import { stripUpstreamCredentials } from "../src/proxy/v1.js";
-import { buildConfig } from "../src/config.js";
-import type { Env } from "../src/env.js";
+import {
+	deployBodySchema,
+	hfDownloadBodySchema,
+	quantizeBodySchema,
+	reloadBodySchema,
+	trainStartBodySchema,
+} from "../src/schemas.js";
 
 const dirs: string[] = [];
 
@@ -17,7 +25,7 @@ function tempDir(): string {
 }
 
 afterEach(() => {
-	for (const d of dirs) {
+	for (const _d of dirs) {
 		dirs.length = 0;
 	}
 });
@@ -29,8 +37,12 @@ function makeConfig(over: Partial<Env> = {}): ReturnType<typeof buildConfig> {
 		LLAMA_RUNTIME_URL: "http://llama-runtime:8080",
 		LLAMA_RUNTIME_CONTAINER: "llama-runtime",
 		MODELS_DIR: "/models",
+		RATE_LIMIT_ENABLED: true,
 		RATE_LIMIT_WINDOW_MS: 900_000,
 		RATE_LIMIT_MAX: 1000,
+		HF_TOKEN: "",
+		HF_HUB_URL: "https://huggingface.co",
+		TRAINER_URL: "http://llama-trainer:8081",
 		...over,
 	});
 }
@@ -118,5 +130,75 @@ describe("proxy credentials", () => {
 		expect(headers).not.toHaveProperty("authorization");
 		expect(headers).not.toHaveProperty("x-api-key");
 		expect(headers["content-type"]).toBe("application/json");
+	});
+});
+
+describe("API Zod schemas & sanitization", () => {
+	it("reloadBodySchema valida modelId y opciones avanzadas", () => {
+		const parsed = reloadBodySchema.safeParse({
+			modelId: "qwen3.5-4b",
+			ctxSize: 32768,
+			cacheTypeK: "q8_0",
+			cacheTypeV: "q4_0",
+			parallel: 2,
+			flashAttn: "on",
+		});
+		expect(parsed.success).toBe(true);
+		if (parsed.success) {
+			expect(parsed.data.modelId).toBe("qwen3.5-4b");
+			expect(parsed.data.ctxSize).toBe(32768);
+			expect(parsed.data.cacheTypeK).toBe("q8_0");
+		}
+	});
+
+	it("reloadBodySchema rechaza path traversal en modelId", () => {
+		expect(reloadBodySchema.safeParse({ modelId: "../secret" }).success).toBe(false);
+		expect(reloadBodySchema.safeParse({ modelId: "" }).success).toBe(false);
+	});
+
+	it("deployBodySchema valida modelName y activate por defecto false", () => {
+		const ok = deployBodySchema.safeParse({ modelName: "mi-modelo-Q4_K_M" });
+		expect(ok.success).toBe(true);
+		if (ok.success) {
+			expect(ok.data.activate).toBe(false);
+		}
+		expect(deployBodySchema.safeParse({ modelName: "../../etc/passwd" }).success).toBe(false);
+	});
+
+	it("hfDownloadBodySchema valida owner, name, file y async", () => {
+		const ok = hfDownloadBodySchema.safeParse({
+			owner: "bartowski",
+			name: "Qwen3.5-4B-GGUF",
+			file: "qwen3.5-4b.gguf",
+			async: true,
+		});
+		expect(ok.success).toBe(true);
+		expect(hfDownloadBodySchema.safeParse({ owner: "a/b", name: "x", file: "y" }).success).toBe(
+			false,
+		);
+	});
+
+	it("trainStartBodySchema y quantizeBodySchema validan parámetros", () => {
+		const trainOk = trainStartBodySchema.safeParse({
+			baseModelId: "Qwen/Qwen2.5-3B",
+			datasetId: "instrucciones-es",
+			method: "qlora",
+		});
+		expect(trainOk.success).toBe(true);
+
+		const quantOk = quantizeBodySchema.safeParse({
+			modelId: "mi-modelo",
+			method: "Q4_K_M",
+			imatrix: true,
+		});
+		expect(quantOk.success).toBe(true);
+		expect(
+			quantizeBodySchema.safeParse({ modelId: "mi-modelo", method: "INVALID" }).success,
+		).toBe(false);
+	});
+
+	it("sanitizeFile elimina directorios y caracteres peligrosos", () => {
+		expect(sanitizeFile("../../models/qwen3.5-4b.gguf")).toBe("qwen3.5-4b.gguf");
+		expect(sanitizeFile("subfolder\\model$name!.gguf")).toBe("modelname.gguf");
 	});
 });

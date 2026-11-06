@@ -2,6 +2,48 @@ import { spawn } from "node:child_process";
 import Docker from "dockerode";
 import type { AppConfig } from "../config.js";
 import type { RegisteredModel } from "../models/registry.js";
+import type { ReloadOptions } from "../schemas.js";
+
+/**
+ * Combina las variables de entorno actuales del contenedor con el nuevo modelo
+ * y los parámetros avanzados de inferencia (KV cache, slots paralelos, flash-attn, etc.).
+ */
+export function mergeContainerEnv(
+	currentEnv: string[],
+	modelId: string,
+	opts: ReloadOptions = {},
+): string[] {
+	const updates = new Map<string, string>([["LLAMA_MODEL", modelId]]);
+	if (opts.ctxSize !== undefined) updates.set("LLAMA_CTX_SIZE", String(opts.ctxSize));
+	if (opts.cacheTypeK !== undefined) updates.set("LLAMA_CACHE_TYPE_K", opts.cacheTypeK);
+	if (opts.cacheTypeV !== undefined) updates.set("LLAMA_CACHE_TYPE_V", opts.cacheTypeV);
+	if (opts.parallel !== undefined) updates.set("LLAMA_PARALLEL", String(opts.parallel));
+	if (opts.threads !== undefined) updates.set("LLAMA_THREADS", String(opts.threads));
+	if (opts.flashAttn !== undefined) updates.set("LLAMA_FLASH_ATTN", opts.flashAttn);
+	if (opts.chatTemplate !== undefined) updates.set("LLAMA_CHAT_TEMPLATE", opts.chatTemplate);
+	if (opts.gpuLayers !== undefined) updates.set("LLAMA_GPU_LAYERS", String(opts.gpuLayers));
+	if (opts.batchSize !== undefined) updates.set("LLAMA_BATCH", String(opts.batchSize));
+	if (opts.ubatchSize !== undefined) updates.set("LLAMA_UBATCH", String(opts.ubatchSize));
+
+	const seen = new Set<string>();
+	const nextEnv = currentEnv.map((kv) => {
+		const idx = kv.indexOf("=");
+		const k = idx > 0 ? kv.slice(0, idx) : kv;
+		if (updates.has(k)) {
+			seen.add(k);
+			return `${k}=${updates.get(k)}`;
+		}
+		return kv;
+	});
+
+	for (const [k, v] of updates.entries()) {
+		if (!seen.has(k)) {
+			nextEnv.push(`${k}=${v}`);
+		}
+	}
+
+	return nextEnv;
+}
 
 /**
  * Gestión del contenedor llama-runtime vía Dockerode (usa el docker.sock montado).
@@ -29,25 +71,16 @@ export class RuntimeManager {
 
 	/**
 	 * Recarga el runtime apuntando a otro modelo (o flags).
-	 * Estrategia simple: reinicia el contenedor; el entrypoint lee las env nuevas.
-	 * `env` = variables a actualizar en el contenedor (ej. LLAMA_MODEL, LLAMA_CTX_SIZE).
+	 * Estrategia simple: recrea el contenedor con las variables LLAMA_* actualizadas.
 	 */
 	async reload(
 		modelId: string,
-		opts: { ctxSize?: number } = {},
+		opts: ReloadOptions = {},
 	): Promise<{ ok: boolean; message: string }> {
 		try {
 			const container = this.docker.getContainer(this.config.runtimeContainer);
 			const info = await container.inspect();
-			const nextEnv = (info.Config?.Env ?? []).map((kv) => {
-				const [k] = kv.split("=");
-				if (k === "LLAMA_MODEL") return `LLAMA_MODEL=${modelId}`;
-				if (k === "LLAMA_CTX_SIZE" && opts.ctxSize) return `LLAMA_CTX_SIZE=${opts.ctxSize}`;
-				return kv;
-			});
-			if (!nextEnv.some((kv) => kv.startsWith("LLAMA_MODEL="))) {
-				nextEnv.push(`LLAMA_MODEL=${modelId}`);
-			}
+			const nextEnv = mergeContainerEnv(info.Config?.Env ?? [], modelId, opts);
 			if (info.State?.Running) {
 				await container.stop();
 			}

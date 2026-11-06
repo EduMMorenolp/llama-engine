@@ -72,15 +72,6 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 	upstreamReq.end();
 }
 
-function writeUpstreamError(res: Response, err: unknown): void {
-	const msg = err instanceof Error ? err.message : String(err);
-	if (!res.headersSent) {
-		res.statusCode = 502;
-		res.setHeader("content-type", "application/json");
-	}
-	res.end(JSON.stringify({ error: { message: `Runtime error: ${msg}`, type: "proxy_error" } }));
-}
-
 /**
  * Copia de los headers del request dejando fuera las credenciales del cliente
  * (authorization / x-api-key). El runtime llama-server no las necesita y reenviarlas

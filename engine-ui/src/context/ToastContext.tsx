@@ -105,4 +105,3 @@ const NOOP_TOAST: ToastContextValue = {
 export function useToast(): ToastContextValue {
 	return useContext(ToastContext) ?? NOOP_TOAST;
 }
-

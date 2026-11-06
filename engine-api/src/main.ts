@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import { join } from "node:path";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import { rateLimit } from "express-rate-limit";
@@ -9,13 +11,21 @@ import { createAuthMiddleware } from "./middleware/auth.js";
 import { ModelRegistry } from "./models/registry.js";
 import { createV1Proxy } from "./proxy/v1.js";
 import { RuntimeManager } from "./runtime/manager.js";
+import {
+	deployBodySchema,
+	formatZodError,
+	hfDownloadBodySchema,
+	quantizeBodySchema,
+	reloadBodySchema,
+	trainStartBodySchema,
+} from "./schemas.js";
 import { StatusService } from "./status/index.js";
 
 /**
  * Expone solo vars LLAMA_* del contenedor. Nunca apiKey ni ninguna env que
  * contenga KEY / PASS / SECRET (defensa doble aunque el prefijo ya sea seguro).
  */
-function sanitizeRuntimeEnv(env: Record<string, string>): Record<string, string> {
+export function sanitizeRuntimeEnv(env: Record<string, string>): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const [k, v] of Object.entries(env)) {
 		if (!k.startsWith("LLAMA_")) continue;
@@ -23,6 +33,26 @@ function sanitizeRuntimeEnv(env: Record<string, string>): Record<string, string>
 		out[k] = v;
 	}
 	return out;
+}
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB para datasets .jsonl
+
+function readRawRequestBody(req: Request, maxBytes = MAX_UPLOAD_BYTES): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const chunks: Buffer[] = [];
+		let total = 0;
+		req.on("data", (chunk: Buffer) => {
+			total += chunk.length;
+			if (total > maxBytes) {
+				reject(new Error("Payload exceeds limit"));
+				req.destroy();
+				return;
+			}
+			chunks.push(chunk);
+		});
+		req.on("end", () => resolve(Buffer.concat(chunks)));
+		req.on("error", reject);
+	});
 }
 
 async function bootstrap() {
@@ -75,17 +105,17 @@ async function bootstrap() {
 	});
 
 	app.post("/api/models/reload", async (req, res) => {
-		const modelId = String(req.body?.modelId ?? "");
-		const ctxSize = Number(req.body?.ctxSize ?? 0) || undefined;
-		if (!modelId) {
-			res.status(400).json({ error: { message: "modelId es requerido" } });
+		const parsed = reloadBodySchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
 			return;
 		}
+		const { modelId, ...opts } = parsed.data;
 		if (!registry.get(modelId)) {
 			res.status(404).json({ error: { message: `Modelo "${modelId}" no registrado` } });
 			return;
 		}
-		const result = await runtime.reload(modelId, ctxSize ? { ctxSize } : {});
+		const result = await runtime.reload(modelId, opts);
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
@@ -141,17 +171,41 @@ async function bootstrap() {
 		try {
 			const response = await fetch(`${config.trainerUrl}/api/datasets`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.json({ datasets: [] });
 		}
 	});
 
+	app.post("/api/datasets", async (req, res) => {
+		const contentType = req.headers["content-type"] ?? "";
+		if (!contentType.includes("multipart/form-data")) {
+			res
+				.status(400)
+				.json({ error: { message: "Se requiere multipart/form-data con campo file" } });
+			return;
+		}
+		try {
+			const rawBody = await readRawRequestBody(req);
+			const response = await fetch(`${config.trainerUrl}/api/datasets`, {
+				method: "POST",
+				headers: { "content-type": contentType },
+				body: new Uint8Array(rawBody),
+			});
+			const data = await response.json();
+			res.status(response.status).json(data);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : "Trainer service unavailable";
+			res.status(502).json({ error: { message: msg } });
+		}
+	});
+
 	app.get("/api/datasets/:id/validate", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/datasets/${req.params.id}/validate`);
+			const id = encodeURIComponent(req.params.id);
+			const response = await fetch(`${config.trainerUrl}/api/datasets/${id}/validate`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -159,13 +213,12 @@ async function bootstrap() {
 
 	app.get("/api/datasets/:id/preview", async (req, res) => {
 		try {
+			const id = encodeURIComponent(req.params.id);
 			const limit = String(req.query.limit ?? "");
 			const qs = limit ? `?limit=${encodeURIComponent(limit)}` : "";
-			const response = await fetch(
-				`${config.trainerUrl}/api/datasets/${req.params.id}/preview${qs}`,
-			);
+			const response = await fetch(`${config.trainerUrl}/api/datasets/${id}/preview${qs}`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -173,11 +226,12 @@ async function bootstrap() {
 
 	app.delete("/api/datasets/:id", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/datasets/${req.params.id}`, {
+			const id = encodeURIComponent(req.params.id);
+			const response = await fetch(`${config.trainerUrl}/api/datasets/${id}`, {
 				method: "DELETE",
 			});
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -185,14 +239,19 @@ async function bootstrap() {
 
 	// ---- Training (proxy to trainer) ----
 	app.post("/api/train/start", async (req, res) => {
+		const parsed = trainStartBodySchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
+			return;
+		}
 		try {
 			const response = await fetch(`${config.trainerUrl}/api/train/start`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(req.body),
+				body: JSON.stringify(parsed.data),
 			});
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -202,7 +261,7 @@ async function bootstrap() {
 		try {
 			const response = await fetch(`${config.trainerUrl}/api/train/jobs`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.json({ jobs: [] });
 		}
@@ -210,9 +269,10 @@ async function bootstrap() {
 
 	app.get("/api/train/jobs/:jobId", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${req.params.jobId}`);
+			const jobId = encodeURIComponent(req.params.jobId);
+			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${jobId}`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -220,11 +280,12 @@ async function bootstrap() {
 
 	app.post("/api/train/jobs/:jobId/stop", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${req.params.jobId}/stop`, {
+			const jobId = encodeURIComponent(req.params.jobId);
+			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${jobId}/stop`, {
 				method: "POST",
 			});
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
@@ -235,43 +296,83 @@ async function bootstrap() {
 		try {
 			const response = await fetch(`${config.trainerUrl}/api/quantize/methods`);
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.json({ methods: [] });
 		}
 	});
 
 	app.post("/api/quantize", async (req, res) => {
+		const parsed = quantizeBodySchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
+			return;
+		}
 		try {
 			const response = await fetch(`${config.trainerUrl}/api/quantize`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(req.body),
+				body: JSON.stringify(parsed.data),
 			});
 			const data = await response.json();
-			res.json(data);
+			res.status(response.status).json(data);
 		} catch {
 			res.status(502).json({ error: { message: "Trainer service unavailable" } });
 		}
 	});
 
-	// ---- Deploy (local) ----
+	app.get("/api/quantize/jobs/:jobId", async (req, res) => {
+		try {
+			const jobId = encodeURIComponent(req.params.jobId);
+			const response = await fetch(`${config.trainerUrl}/api/quantize/jobs/${jobId}`);
+			const data = await response.json();
+			res.status(response.status).json(data);
+		} catch {
+			res.status(502).json({ error: { message: "Trainer service unavailable" } });
+		}
+	});
+
+	// ---- Deploy (local + optional activation) ----
 	app.post("/api/models/deploy", async (req, res) => {
-		const { modelName, activate } = (req.body ?? {}) as { modelName?: string; activate?: boolean };
-		if (!modelName) {
-			res.status(400).json({ error: { message: "modelName es requerido" } });
+		const parsed = deployBodySchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
 			return;
 		}
-		const modelPath = `${config.modelsDir}/${modelName}.gguf`;
-		const fs = await import("node:fs/promises");
+		const { modelName, activate } = parsed.data;
+		const modelPath = join(config.modelsDir, `${modelName}.gguf`);
 		try {
 			await fs.access(modelPath);
-			res.json({ ok: true, message: `Modelo ${modelName} encontrado en ${config.modelsDir}` });
 		} catch {
 			res
 				.status(404)
 				.json({ error: { message: `Modelo ${modelName} no encontrado en ${config.modelsDir}` } });
+			return;
 		}
+
+		if (activate) {
+			const reloadResult = await runtime.reload(modelName);
+			if (!reloadResult.ok) {
+				res.status(500).json({
+					ok: false,
+					activated: false,
+					error: { message: reloadResult.message },
+				});
+				return;
+			}
+			res.json({
+				ok: true,
+				activated: true,
+				message: `Modelo ${modelName} desplegado y activado en el runtime.`,
+			});
+			return;
+		}
+
+		res.json({
+			ok: true,
+			activated: false,
+			message: `Modelo ${modelName} disponible en ${config.modelsDir}`,
+		});
 	});
 
 	// ---- Hugging Face Hub ----
@@ -295,17 +396,39 @@ async function bootstrap() {
 		}
 	});
 
-	app.post("/api/hf/download", async (req, res) => {
-		const { owner, name, file } = (req.body ?? {}) as {
-			owner?: string;
-			name?: string;
-			file?: string;
-		};
-		if (!owner || !name || !file) {
-			res.status(400).json({ error: { message: "owner, name y file son requeridos" } });
+	app.get("/api/hf/downloads", (_req, res) => {
+		res.json({ jobs: hub.listDownloadJobs() });
+	});
+
+	app.get("/api/hf/downloads/:jobId", (req, res) => {
+		const job = hub.getDownloadJob(req.params.jobId);
+		if (!job) {
+			res.status(404).json({ error: { message: "Job de descarga no encontrado" } });
 			return;
 		}
+		res.json(job);
+	});
+
+	app.post("/api/hf/download", async (req, res) => {
+		const parsed = hfDownloadBodySchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
+			return;
+		}
+		const { owner, name, file, async: isAsync } = parsed.data;
 		try {
+			if (isAsync) {
+				const job = hub.startDownloadJob(owner, name, file);
+				res.status(202).json({
+					ok: true,
+					async: true,
+					job,
+					id: job.id,
+					sizeBytes: job.totalBytes,
+					message: `Descarga de "${job.id}" iniciada en segundo plano`,
+				});
+				return;
+			}
 			const result = await hub.downloadGGUF(owner, name, file);
 			res.status(200).json({ ok: true, ...result, message: `"${result.id}" descargado` });
 		} catch (err) {
@@ -332,10 +455,12 @@ async function bootstrap() {
 	});
 }
 
-bootstrap().catch((err) => {
-	console.error("[engine-api] fatal:", err);
-	process.exit(1);
-});
+if (process.env.VITEST !== "true") {
+	bootstrap().catch((err) => {
+		console.error("[engine-api] fatal:", err);
+		process.exit(1);
+	});
+}
 
 function respondHubError(res: Response, err: unknown) {
 	if (
@@ -346,6 +471,10 @@ function respondHubError(res: Response, err: unknown) {
 		const status = (err as { status: number }).status;
 		if (status === 404) {
 			res.status(404).json({ error: { message: "No encontrado en el Hub" } });
+			return;
+		}
+		if (status === 400 || status === 409) {
+			res.status(status).json({ error: { message: err.message } });
 			return;
 		}
 		res.status(502).json({ error: { message: err.message } });

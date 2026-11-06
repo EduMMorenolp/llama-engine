@@ -53,8 +53,9 @@ engine-ui → GET /api/status (con API_KEY)
 
 ### Gestión del runtime
 ```
-POST /api/models/reload {modelId, ctxSize?} → Dockerode recrea el contenedor
-  con LLAMA_MODEL actualizado y lo reinicia (entrypoint compone los flags).
+POST /api/models/reload {modelId, ctxSize?, cacheTypeK?, cacheTypeV?, parallel?, flashAttn?}
+  → Dockerode recrea el contenedor con LLAMA_MODEL y variables LLAMA_* actualizadas
+  y lo reinicia (entrypoint compone los flags).
 ```
 
 ## Capas (engine-api)
@@ -62,8 +63,10 @@ POST /api/models/reload {modelId, ctxSize?} → Dockerode recrea el contenedor
 | Módulo | Rol |
 |--------|-----|
 | `env.ts` / `config.ts` | Validación de entorno con Zod + AppConfig tipado. |
-| `runtime/manager.ts` | Dockerode: start/stop/reload/restart/exec del contenedor runtime. |
+| `schemas.ts` | Esquemas Zod para validación de inputs en endpoints (`reload`, `deploy`, `hf/download`, `train/start`, `quantize`). |
+| `runtime/manager.ts` | Dockerode: start/stop/reload/restart/exec del contenedor runtime y fusión de `LLAMA_*`. |
 | `models/registry.ts` | Scan de `MODELS_DIR` → registro de GGUFs (con detección de visión). |
+| `hub/hf.ts` | Búsqueda en Hugging Face Hub y descarga GGUF (sincrónica o por job en background con progreso y escritura `.part`). |
 | `status/index.ts` | Telemetría agregada: GPU + slots + modelo + registro. |
 | `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con re-emisión del body y streaming SSE. |
 | `middleware/auth.ts` | Auth por API key (`x-api-key` o `Bearer`). |

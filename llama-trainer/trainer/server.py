@@ -5,6 +5,7 @@ llama-trainer server — API for fine-tuning, conversion, and quantization.
 import argparse
 import json
 import os
+import re
 import subprocess
 import threading
 import uuid
@@ -13,6 +14,7 @@ from typing import Optional
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 CORS(app)
@@ -22,6 +24,25 @@ DATA_DIR = "/data"
 MODELS_DIR = "/models"
 TRAINING_JOBS: dict[str, dict] = {}
 QUANTIZE_JOBS: dict[str, dict] = {}
+ALLOWED_QUANT_METHODS = {"Q3_K_M", "Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0", "F16"}
+
+
+def sanitize_identifier(raw: str) -> str:
+    """Sanitiza un identificador de modelo o dataset previniendo Path Traversal."""
+    cleaned = secure_filename(str(raw or "").strip())
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]", "", cleaned).strip(".")
+    if not cleaned:
+        raise ValueError("Invalid identifier")
+    return cleaned
+
+
+def safe_join(base_dir: Path, filename: str) -> Path:
+    """Resuelve una ruta dentro de base_dir garantizando que no escape del directorio."""
+    base_resolved = base_dir.resolve()
+    target = (base_resolved / filename).resolve()
+    if target != base_resolved and not str(target).startswith(str(base_resolved) + os.sep):
+        raise ValueError("Path traversal detected")
+    return target
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +77,19 @@ def upload_dataset():
     ds_dir = Path(DATA_DIR) / "datasets"
     ds_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = file.filename
+    try:
+        filename = sanitize_identifier(file.filename)
+    except ValueError:
+        return jsonify({"error": "Invalid filename"}), 400
+
     if not filename.endswith((".jsonl", ".json")):
         return jsonify({"error": "File must be .jsonl or .json"}), 400
 
-    save_path = ds_dir / filename
+    try:
+        save_path = safe_join(ds_dir, filename)
+    except ValueError:
+        return jsonify({"error": "Invalid dataset path"}), 400
+
     file.save(str(save_path))
 
     count = sum(1 for _ in save_path.open())
@@ -75,9 +104,14 @@ def upload_dataset():
 
 @app.route("/api/datasets/<dataset_id>", methods=["DELETE"])
 def delete_dataset(dataset_id: str):
+    try:
+        safe_id = sanitize_identifier(dataset_id)
+    except ValueError:
+        return jsonify({"error": "Invalid dataset id"}), 400
+
     ds_dir = Path(DATA_DIR) / "datasets"
     for ext in (".jsonl", ".json"):
-        p = ds_dir / f"{dataset_id}{ext}"
+        p = safe_join(ds_dir, f"{safe_id}{ext}")
         if p.exists():
             p.unlink()
             return jsonify({"ok": True})
@@ -86,9 +120,14 @@ def delete_dataset(dataset_id: str):
 
 @app.route("/api/datasets/<dataset_id>/validate", methods=["GET"])
 def validate_dataset(dataset_id: str):
+    try:
+        safe_id = sanitize_identifier(dataset_id)
+    except ValueError:
+        return jsonify({"error": "Invalid dataset id"}), 400
+
     ds_dir = Path(DATA_DIR) / "datasets"
     for ext in (".jsonl", ".json"):
-        p = ds_dir / f"{dataset_id}{ext}"
+        p = safe_join(ds_dir, f"{safe_id}{ext}")
         if p.exists():
             return jsonify(validate_file(p))
     return jsonify({"error": "Dataset not found"}), 404
@@ -97,12 +136,17 @@ def validate_dataset(dataset_id: str):
 @app.route("/api/datasets/<dataset_id>/preview", methods=["GET"])
 def preview_dataset(dataset_id: str):
     try:
+        safe_id = sanitize_identifier(dataset_id)
+    except ValueError:
+        return jsonify({"error": "Invalid dataset id"}), 400
+
+    try:
         limit = max(1, min(int(request.args.get("limit", 3)), 20))
     except (TypeError, ValueError):
         limit = 3
     ds_dir = Path(DATA_DIR) / "datasets"
     for ext in (".jsonl", ".json"):
-        p = ds_dir / f"{dataset_id}{ext}"
+        p = safe_join(ds_dir, f"{safe_id}{ext}")
         if p.exists():
             return jsonify(preview_file(p, limit))
     return jsonify({"error": "Dataset not found"}), 404
@@ -325,7 +369,14 @@ def run_training(job_id: str):
             model.print_trainable_parameters()
 
         # 4. Load dataset
-        dataset_path = f"{DATA_DIR}/datasets/{dataset_id}.jsonl"
+        safe_dataset_id = sanitize_identifier(dataset_id)
+        ds_dir = Path(DATA_DIR) / "datasets"
+        dataset_file = safe_join(ds_dir, f"{safe_dataset_id}.jsonl")
+        if not dataset_file.exists():
+            alt_file = safe_join(ds_dir, f"{safe_dataset_id}.json")
+            if alt_file.exists():
+                dataset_file = alt_file
+        dataset_path = str(dataset_file)
         dataset = load_dataset("json", data_files=dataset_path, split="train")
 
         # 5. Format dataset for SFT
@@ -383,6 +434,9 @@ def run_training(job_id: str):
         if job["status"] == "stopped":
             job["logs"].append("Entrenamiento detenido por el usuario")
         else:
+            job["status"] = "completed"
+            job["progress"] = 100
+            job["epoch"] = epochs
             job["logs"].append("Training completed successfully!")
             job["modelPath"] = output_dir
 
@@ -410,9 +464,16 @@ def get_quantize_methods():
 @app.route("/api/quantize", methods=["POST"])
 def quantize_model():
     data = request.get_json(force=True)
-    model_id = data.get("modelId", "")
-    method = data.get("method", "Q4_K_M")
-    use_imatrix = data.get("imatrix", False)
+    try:
+        model_id = sanitize_identifier(data.get("modelId", ""))
+    except ValueError:
+        return jsonify({"error": "Invalid modelId"}), 400
+
+    method = str(data.get("method", "Q4_K_M")).strip()
+    if method not in ALLOWED_QUANT_METHODS:
+        return jsonify({"error": f"Unsupported quantization method: {method}"}), 400
+
+    use_imatrix = bool(data.get("imatrix", False))
 
     job_id = str(uuid.uuid4())[:8]
     job = {
@@ -437,23 +498,47 @@ def get_quantize_job(job_id: str):
     return jsonify(job)
 
 
+def ensure_calibration_file(calibration_path: Path) -> Path:
+    """Garantiza que exista un archivo de calibración para llama-imatrix."""
+    if not calibration_path.exists():
+        calibration_path.parent.mkdir(parents=True, exist_ok=True)
+        calibration_path.write_text(
+            "Llama Engine calibration corpus.\n"
+            "El aprendizaje automático y los modelos de lenguaje grandes requieren cuantización "
+            "precisa para preservar la distribución de activaciones en capas de atención y MLP.\n"
+            "In computer science, quantization maps continuous or high-precision values to a smaller set "
+            "of discrete levels while minimizing perplexity degradation across reasoning tasks.\n"
+            "def fibonacci(n: int) -> int:\n"
+            "    a, b = 0, 1\n"
+            "    for _ in range(n):\n"
+            "        a, b = b, a + b\n"
+            "    return a\n",
+            encoding="utf-8",
+        )
+    return calibration_path
+
+
 def run_quantize(job_id: str, model_id: str, method: str, use_imatrix: bool):
     job = QUANTIZE_JOBS[job_id]
     try:
-        input_path = Path(MODELS_DIR) / f"{model_id}.gguf"
+        safe_model_id = sanitize_identifier(model_id)
+        models_dir = Path(MODELS_DIR)
+        output_base = Path(DATA_DIR) / "output"
+
+        input_path = safe_join(models_dir, f"{safe_model_id}.gguf")
         if not input_path.exists():
             # Check if it's an HF model in output
-            input_path = Path("/data/output") / model_id / "adapter_model.safetensors"
+            input_path = safe_join(output_base, f"{safe_model_id}/adapter_model.safetensors")
             if not input_path.exists():
                 job["status"] = "failed"
-                job["error"] = f"Model {model_id} not found"
+                job["error"] = f"Model {safe_model_id} not found"
                 return
 
-        output_path = Path(MODELS_DIR) / f"{model_id}-{method}.gguf"
+        output_path = safe_join(models_dir, f"{safe_model_id}-{method}.gguf")
 
         # If HF model, convert first
         if input_path.suffix == ".safetensors":
-            gguf_path = Path("/data/output") / f"{model_id}-f16.gguf"
+            gguf_path = safe_join(output_base, f"{safe_model_id}-f16.gguf")
             subprocess.run([
                 "python3", "/usr/local/bin/convert_hf_to_gguf.py",
                 str(input_path.parent),
@@ -465,12 +550,13 @@ def run_quantize(job_id: str, model_id: str, method: str, use_imatrix: bool):
         # Quantize
         cmd = ["llama-quantize"]
         if use_imatrix:
-            imatrix_path = Path("/data/output") / f"{job_id}_imatrix.dat"
+            imatrix_path = safe_join(output_base, f"{job_id}_imatrix.dat")
+            calibration_file = ensure_calibration_file(Path("/workspace/calibration.txt"))
             # Generate imatrix first
             subprocess.run([
                 "llama-imatrix",
                 "-m", str(input_path),
-                "-f", "/workspace/calibration.txt",
+                "-f", str(calibration_file),
                 "-ngl", "99",
                 "-o", str(imatrix_path),
             ], check=True)
@@ -502,26 +588,18 @@ def run_quantize(job_id: str, model_id: str, method: str, use_imatrix: bool):
 @app.route("/api/models/deploy", methods=["POST"])
 def deploy_model():
     data = request.get_json(force=True)
-    model_name = data.get("modelName", "")
-    activate = data.get("activate", False)
+    raw_name = data.get("modelName", "")
+    activate = bool(data.get("activate", False))
 
-    if not model_name:
-        return jsonify({"error": "modelName required"}), 400
+    try:
+        model_name = sanitize_identifier(raw_name)
+    except ValueError:
+        return jsonify({"error": "modelName required and must be valid"}), 400
 
-    source = Path(MODELS_DIR) / f"{model_name}.gguf"
+    models_dir = Path(MODELS_DIR)
+    source = safe_join(models_dir, f"{model_name}.gguf")
     if not source.exists():
         return jsonify({"error": f"Model {model_name}.gguf not found in {MODELS_DIR}"}), 404
-
-    if activate:
-        target = Path(MODELS_DIR) / f"{model_name}.gguf"
-        if target != source:
-            try:
-                import shutil
-                if target.exists():
-                    target.unlink()
-                shutil.copy2(source, target)
-            except Exception as e:
-                return jsonify({"error": f"Failed to deploy: {str(e)}"}), 500
 
     return jsonify({
         "ok": True,

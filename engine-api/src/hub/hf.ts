@@ -1,6 +1,7 @@
-import { createWriteStream, existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { createWriteStream, existsSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { AppConfig } from "../config.js";
 
@@ -30,6 +31,21 @@ export interface HubRepoDetail {
 	ggufFiles: HubFile[];
 }
 
+export interface HubDownloadJob {
+	jobId: string;
+	id: string;
+	owner: string;
+	name: string;
+	file: string;
+	status: "running" | "completed" | "failed";
+	downloadedBytes: number;
+	totalBytes: number;
+	progress: number;
+	error?: string;
+	startedAt: string;
+	completedAt?: string;
+}
+
 export class HubError extends Error {
 	constructor(
 		message: string,
@@ -55,11 +71,12 @@ interface TreeEntry {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
-const USER_AGENT = "llama-engine/0.1.0";
+const USER_AGENT = "llama-engine/0.4.0";
 
 export class HuggingFaceHub {
 	private readonly base: string;
 	private readonly headers: Record<string, string>;
+	private readonly downloadJobs = new Map<string, HubDownloadJob>();
 
 	constructor(private readonly config: AppConfig) {
 		this.base = config.hubUrl.replace(/\/+$/, "");
@@ -115,6 +132,51 @@ export class HuggingFaceHub {
 		};
 	}
 
+	listDownloadJobs(): HubDownloadJob[] {
+		return Array.from(this.downloadJobs.values());
+	}
+
+	getDownloadJob(jobId: string): HubDownloadJob | undefined {
+		return this.downloadJobs.get(jobId);
+	}
+
+	startDownloadJob(owner: string, name: string, file: string): HubDownloadJob {
+		const safeFile = sanitizeFile(file);
+		if (!safeFile.endsWith(".gguf")) {
+			throw new HubError("El archivo debe ser un .gguf", 400);
+		}
+		const id = safeFile.replace(/\.gguf$/, "");
+		const target = join(this.config.modelsDir, `${id}.gguf`);
+		if (existsSync(target)) {
+			throw new HubError(`"${id}" ya existe en /models`, 409);
+		}
+
+		// Si ya hay un job activo para el mismo archivo, devolverlo
+		for (const existing of this.downloadJobs.values()) {
+			if (existing.id === id && existing.status === "running") {
+				return existing;
+			}
+		}
+
+		const jobId = randomUUID().slice(0, 8);
+		const job: HubDownloadJob = {
+			jobId,
+			id,
+			owner,
+			name,
+			file: safeFile,
+			status: "running",
+			downloadedBytes: 0,
+			totalBytes: 0,
+			progress: 0,
+			startedAt: new Date().toISOString(),
+		};
+		this.downloadJobs.set(jobId, job);
+
+		void this.runDownload(job, target);
+		return job;
+	}
+
 	async downloadGGUF(
 		owner: string,
 		name: string,
@@ -130,19 +192,70 @@ export class HuggingFaceHub {
 			throw new HubError(`"${id}" ya existe en /models`, 409);
 		}
 
-		const url = new URL(`${this.base}/${owner}/${name}/resolve/main/${safeFile}`);
-		const res = await fetch(url, {
-			headers: this.headers,
-			redirect: "follow",
-			signal: AbortSignal.timeout(600_000),
-		});
-		if (!res.ok || !res.body) {
-			throw new HubError(`Descarga falló (${res.status})`, res.status);
-		}
+		const jobId = randomUUID().slice(0, 8);
+		const job: HubDownloadJob = {
+			jobId,
+			id,
+			owner,
+			name,
+			file: safeFile,
+			status: "running",
+			downloadedBytes: 0,
+			totalBytes: 0,
+			progress: 0,
+			startedAt: new Date().toISOString(),
+		};
+		this.downloadJobs.set(jobId, job);
 
-		await pipeline(Readable.fromWeb(res.body as never), createWriteStream(target));
-		const stat = (await import("node:fs")).statSync(target);
-		return { id, sizeBytes: stat.size };
+		await this.runDownload(job, target, true);
+		return { id, sizeBytes: job.downloadedBytes };
+	}
+
+	private async runDownload(job: HubDownloadJob, target: string, rethrow = false): Promise<void> {
+		const partPath = `${target}.part`;
+		try {
+			const url = new URL(`${this.base}/${job.owner}/${job.name}/resolve/main/${job.file}`);
+			const res = await fetch(url, {
+				headers: this.headers,
+				redirect: "follow",
+				signal: AbortSignal.timeout(1_800_000),
+			});
+			if (!res.ok || !res.body) {
+				throw new HubError(`Descarga falló (${res.status})`, res.status);
+			}
+
+			const contentLength = Number(res.headers.get("content-length") ?? 0);
+			if (Number.isFinite(contentLength) && contentLength > 0) {
+				job.totalBytes = contentLength;
+			}
+
+			const counter = new Transform({
+				transform(chunk: Buffer, _encoding, callback) {
+					job.downloadedBytes += chunk.length;
+					if (job.totalBytes > 0) {
+						job.progress = Math.min(99, Math.round((job.downloadedBytes / job.totalBytes) * 100));
+					}
+					callback(null, chunk);
+				},
+			});
+
+			await pipeline(Readable.fromWeb(res.body as never), counter, createWriteStream(partPath));
+			renameSync(partPath, target);
+			const stat = statSync(target);
+			job.downloadedBytes = stat.size;
+			job.totalBytes = stat.size;
+			job.progress = 100;
+			job.status = "completed";
+			job.completedAt = new Date().toISOString();
+		} catch (err) {
+			try {
+				if (existsSync(partPath)) unlinkSync(partPath);
+			} catch {}
+			job.status = "failed";
+			job.error = err instanceof Error ? err.message : String(err);
+			job.completedAt = new Date().toISOString();
+			if (rethrow) throw err;
+		}
 	}
 
 	private async getJson(url: URL): Promise<unknown> {
@@ -163,7 +276,7 @@ function splitId(id: string): { owner: string; name: string } {
 	return { owner: id.slice(0, slash), name: id.slice(slash + 1) };
 }
 
-function sanitizeFile(file: string): string {
+export function sanitizeFile(file: string): string {
 	const base = file.replace(/\\/g, "/").split("/").pop() ?? "";
 	return base.replace(/[^a-zA-Z0-9._-]/g, "");
 }

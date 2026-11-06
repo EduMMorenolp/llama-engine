@@ -29,8 +29,19 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   - **RuntimeContext compartido**: elimina el polling duplicado entre `Layout` y vistas hijas, conserva el historial de telemetría (`tok/s`, prompt `tok/s`, uso y temperatura GPU) durante toda la sesión y agrega selector de frecuencia (`3s`, `5s`, `10s`, pausa).
   - **Command Palette (`Ctrl+K`)**: búsqueda rápida de pantallas, cambio de modelo GGUF activo y acciones del runtime.
   - **Sistema de diseño**: soporte para Modo Oscuro y Modo Claro (`ThemeProvider`), sistema de notificaciones `ToastProvider`, diálogos de confirmación (`ConfirmDialog`), `ErrorBoundary` e iconografía vectorial SVG (`Icons.tsx`).
-  - **Mejoras por pantalla**: Hero banner y mini-chart en Dashboard; filtros, ordenamiento, presets de contexto y estimador de VRAM en Modelos; visor de logs con búsqueda, filtro de severidad, copia y descarga `.log` en Runtime; doble gráfica y tabla de slots en Telemetría; generador de snippets API (`cURL`, `Python`, `TypeScript`, `opencode`, `Hermes`) y buscador en Ayuda.
-  - Corrección de todos los errores de Biome/accesibilidad y de la doble invocación de quantización en `ModelWizard`.
+  - **Mejoras por pantalla**: Hero banner y mini-chart en Dashboard; filtros, ordenamiento, presets de contexto, panel de parámetros avanzados de KV Cache/Flash Attention, barra de progreso de descarga GGUF en tiempo real y estimador de VRAM en Modelos; visor de logs con búsqueda, filtro de severidad, copia y descarga `.log` en Runtime; doble gráfica y tabla de slots en Telemetría; generador de snippets API (`cURL`, `Python`, `TypeScript`, `opencode`, `Hermes`) y buscador en Ayuda.
+  - **nginx.conf**: soporte de proxy reverso `/v1/` sin buffering (`proxy_buffering off`) para streaming SSE desde el mismo origen.
+  - Corrección de todos los errores de Biome/accesibilidad, de la doble invocación de quantización en `ModelWizard` y soporte de polling de jobs de quantización (`GET /api/quantize/jobs/:jobId`).
+- **engine-api**: Mejoras integrales de validación, runtime y proxy al trainer:
+  - Nuevos esquemas **Zod** (`src/schemas.ts`) para validar todas las entradas (`reload`, `deploy`, `hf/download`, `train/start`, `quantize`) y prevenir Path Traversal.
+  - `RuntimeManager.reload()` y `POST /api/models/reload` soportan parámetros avanzados de inferencia (`cacheTypeK`, `cacheTypeV`, `parallel`, `threads`, `flashAttn`, `chatTemplate`, `gpuLayers`, `batchSize`, `ubatchSize`).
+  - Nuevo proxy `POST /api/datasets` (subida multipart `.jsonl` hacia `llama-trainer`) y `GET /api/quantize/jobs/:jobId`.
+  - `POST /api/models/deploy` ahora recarga automáticamente `llama-runtime` cuando `activate: true`.
+  - `HuggingFaceHub` soporta descargas asíncronas en segundo plano con seguimiento de progreso (`GET /api/hf/downloads`, `GET /api/hf/downloads/:jobId`) y escritura atómica vía archivo temporal `.part`.
+- **llama-trainer**: Seguridad, ciclo de vida de jobs y soporte completo de `llama-imatrix`:
+  - Sanitización estricta de nombres de archivos e identificadores (`sanitize_identifier`, `safe_join` con `werkzeug.utils.secure_filename`) en todos los endpoints de datasets, entrenamiento, quantización y deploy.
+  - Corrección de estado final en `run_training`: asigna `status = "completed"`, `progress = 100` y `epoch = epochs` al concluir `trainer.train()`.
+  - `llama-trainer/Dockerfile` ahora compila el target `llama-imatrix` junto con `llama-quantize`, y `server.py` genera un corpus de calibración por defecto si `/workspace/calibration.txt` no existe.
 - **docs**: Nuevo reporte de auditoría y mejoras integrales en [`docs/updates/ANALISIS_Y_REPORTE_MEJORAS.md`](./docs/updates/ANALISIS_Y_REPORTE_MEJORAS.md).
 - **docs**: Nueva guía [`docs/INTEGRACION-HERMES.md`](./docs/INTEGRACION-HERMES.md) para usar el motor como proveedor local de **Hermes Agent** (bloque `providers:` + `model_aliases:` en `config.yaml`), con selección vía `--provider`/`/model`, notas de thinking/tool-calling y troubleshooting.
 - **engine-agent** (nuevo servicio de agente autónomo):

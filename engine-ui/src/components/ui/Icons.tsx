@@ -322,4 +322,3 @@ export function IconMenu(props: IconProps) {
 		</Svg>
 	);
 }
-

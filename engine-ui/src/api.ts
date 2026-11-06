@@ -108,8 +108,31 @@ export async function fetchRuntimeLogs(tail = 100): Promise<RuntimeLogs> {
 	return get(`/api/runtime/logs?tail=${tail}`);
 }
 
-export async function reloadModel(modelId: string, ctxSize?: number): Promise<ActionResult> {
-	return post("/api/models/reload", { modelId, ...(ctxSize != null ? { ctxSize } : {}) });
+export interface ReloadOptions {
+	ctxSize?: number;
+	cacheTypeK?: "f16" | "q8_0" | "q4_0" | "q4_1" | "q5_0" | "q5_1";
+	cacheTypeV?: "f16" | "q8_0" | "q4_0" | "q4_1" | "q5_0" | "q5_1";
+	parallel?: number;
+	threads?: number;
+	flashAttn?: "on" | "off" | "auto";
+}
+
+export async function reloadModel(
+	modelId: string,
+	opts?: number | ReloadOptions,
+): Promise<ActionResult> {
+	const payload: Record<string, unknown> = { modelId };
+	if (typeof opts === "number") {
+		payload.ctxSize = opts;
+	} else if (opts && typeof opts === "object") {
+		if (opts.ctxSize != null) payload.ctxSize = opts.ctxSize;
+		if (opts.cacheTypeK) payload.cacheTypeK = opts.cacheTypeK;
+		if (opts.cacheTypeV) payload.cacheTypeV = opts.cacheTypeV;
+		if (opts.parallel != null) payload.parallel = opts.parallel;
+		if (opts.threads != null) payload.threads = opts.threads;
+		if (opts.flashAttn) payload.flashAttn = opts.flashAttn;
+	}
+	return post("/api/models/reload", payload);
 }
 
 export async function restartRuntime(): Promise<ActionResult> {
@@ -150,6 +173,19 @@ export interface HubRepoDetail {
 	ggufFiles: HubFile[];
 }
 
+export interface HubDownloadJob {
+	jobId: string;
+	id: string;
+	owner: string;
+	name: string;
+	file: string;
+	status: "running" | "completed" | "failed";
+	downloadedBytes: number;
+	totalBytes: number;
+	progress: number;
+	error?: string;
+}
+
 export async function searchHf(q: string): Promise<HubModel[]> {
 	const res = await get(`/api/hf/search?q=${encodeURIComponent(q)}`);
 	return (res as { results: HubModel[] }).results;
@@ -161,6 +197,18 @@ export async function fetchHfRepo(owner: string, name: string): Promise<HubRepoD
 
 export async function downloadHf(owner: string, name: string, file: string): Promise<ActionResult> {
 	return post("/api/hf/download", { owner, name, file });
+}
+
+export async function startHfDownload(
+	owner: string,
+	name: string,
+	file: string,
+): Promise<{ ok: boolean; job: HubDownloadJob; message?: string }> {
+	return post("/api/hf/download", { owner, name, file, async: true });
+}
+
+export async function getHfDownloadJob(jobId: string): Promise<HubDownloadJob> {
+	return get(`/api/hf/downloads/${encodeURIComponent(jobId)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +333,7 @@ export interface QuantizeMethod {
 }
 
 export interface QuantizeResult {
+	id?: string;
 	jobId?: string;
 	status?: string;
 	method: string;
@@ -292,6 +341,7 @@ export interface QuantizeResult {
 	outputPath?: string;
 	inputSize?: number;
 	outputSize: number;
+	error?: string;
 }
 
 export async function getQuantizeMethods(): Promise<QuantizeMethod[]> {
@@ -305,6 +355,10 @@ export async function quantizeModel(
 	useImatrix?: boolean,
 ): Promise<QuantizeResult> {
 	return post("/api/quantize", { modelId, method, imatrix: useImatrix });
+}
+
+export async function getQuantizeJob(jobId: string): Promise<QuantizeResult> {
+	return get(`/api/quantize/jobs/${encodeURIComponent(jobId)}`);
 }
 
 // ---------------------------------------------------------------------------

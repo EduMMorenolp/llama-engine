@@ -99,16 +99,16 @@ flowchart TB
 
 ---
 
-## 4. Oportunidades de Mejora por Capa (Backend, Runtime, Infraestructura)
+## 4. Oportunidades de Mejora por Capa (Backend, Runtime, Infraestructura) — Estado: ✅ Completadas
 
-| Capa | Mejora Propuesta | Prioridad | Impacto |
-|------|------------------|-----------|---------|
-| **llama-trainer** | Sanitizar `file.filename` y `dataset_id` con `werkzeug.utils.secure_filename` en `server.py` para prevenir Path Traversal. | 🔴 Alta | Seguridad |
-| **llama-trainer** | Compilar `--target llama-quantize llama-imatrix` en `llama-trainer/Dockerfile`, ya que actualmente solo se compila `llama-quantize` pero `server.py` invoca `llama-imatrix`. | 🔴 Alta | Funcionalidad |
-| **engine-api** | Validar todos los `req.body` y `req.query` (`reload`, `deploy`, `hf/download`, `train/start`, `quantize`) con esquemas **Zod**, cumpliendo la convención de `AGENTS.md`. | 🟡 Media | Robustez |
-| **engine-api** | Permitir configurar flags avanzados en `POST /api/models/reload` (`cacheTypeK`, `cacheTypeV`, `parallel`, `threads`, `flashAttn`, `chatTemplate`) y persistirlos al recrear el contenedor en `RuntimeManager.reload()`. | 🟡 Media | Rendimiento GPU |
-| **engine-api** | Descarga asíncrona de modelos de HuggingFace (`/api/hf/download`) con progreso por SSE o job polling, evitando que descargas de 4–8 GB bloqueen una request HTTP durante minutos. | 🟡 Media | UX / Estabilidad |
-| **engine-ui / nginx** | Agregar bloque `location /v1/ { proxy_pass http://engine-api:3050; proxy_buffering off; }` en `nginx.conf` para soportar streaming SSE sin buffering cuando se consume desde el mismo origen. | 🟢 Rápida | Infraestructura |
+| Capa | Mejora Implementada | Prioridad | Estado |
+|------|---------------------|-----------|--------|
+| **llama-trainer** | Sanitización de `file.filename`, `dataset_id`, `model_id` y `model_name` con `werkzeug.utils.secure_filename` + `safe_join` en `server.py` para prevenir Path Traversal, y cierre de estado `status = "completed"` / `progress = 100` en `run_training`. | 🔴 Alta | ✅ Implementado |
+| **llama-trainer** | Compilación de `--target llama-quantize llama-imatrix` en `llama-trainer/Dockerfile` y generación automática de corpus de calibración `/workspace/calibration.txt`. | 🔴 Alta | ✅ Implementado |
+| **engine-api** | Validación de todas las entradas (`reload`, `deploy`, `hf/download`, `train/start`, `quantize`) con esquemas **Zod** en `src/schemas.ts`, proxies `POST /api/datasets` y `GET /api/quantize/jobs/:jobId`, y activación en `POST /api/models/deploy`. | 🔴 Alta | ✅ Implementado |
+| **engine-api** | Soporte de flags avanzados en `POST /api/models/reload` (`cacheTypeK`, `cacheTypeV`, `parallel`, `threads`, `flashAttn`, `chatTemplate`, `gpuLayers`, `batchSize`, `ubatchSize`) persistidos con `mergeContainerEnv()` en `RuntimeManager.reload()`. | 🟡 Media | ✅ Implementado |
+| **engine-api** | Descarga asíncrona de modelos de HuggingFace (`POST /api/hf/download` con `async: true`, `GET /api/hf/downloads/:jobId`) con escritura atómica `.part` y seguimiento de progreso en vivo desde `ModelsPage.tsx`. | 🟡 Media | ✅ Implementado |
+| **engine-ui / nginx** | Bloque `location /v1/ { proxy_pass http://engine-api:3050; proxy_buffering off; }` agregado en `nginx.conf` para streaming SSE sin buffering desde el mismo origen. | 🟢 Rápida | ✅ Implementado |
 
 ---
 

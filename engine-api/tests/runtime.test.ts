@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { demultiplexLogs } from "../src/runtime/manager.js";
+import { sanitizeRuntimeEnv } from "../src/main.js";
+import { demultiplexLogs, mergeContainerEnv } from "../src/runtime/manager.js";
 
 describe("demultiplexLogs", () => {
 	it("demultiplexa frames stdout y stderr (frame type ignorado)", () => {
@@ -24,6 +25,47 @@ describe("demultiplexLogs", () => {
 
 	it("devuelve string vacío para entrada vacía", () => {
 		expect(demultiplexLogs([])).toBe("");
+	});
+});
+
+describe("mergeContainerEnv", () => {
+	it("actualiza LLAMA_MODEL y agrega flags avanzados de KV cache y atención", () => {
+		const initial = ["PATH=/usr/bin", "LLAMA_MODEL=old-model", "LLAMA_CTX_SIZE=8192"];
+		const next = mergeContainerEnv(initial, "qwen3.5-4b", {
+			ctxSize: 32768,
+			cacheTypeK: "q8_0",
+			cacheTypeV: "q4_0",
+			parallel: 2,
+			flashAttn: "on",
+		});
+		expect(next).toContain("LLAMA_MODEL=qwen3.5-4b");
+		expect(next).toContain("LLAMA_CTX_SIZE=32768");
+		expect(next).toContain("LLAMA_CACHE_TYPE_K=q8_0");
+		expect(next).toContain("LLAMA_CACHE_TYPE_V=q4_0");
+		expect(next).toContain("LLAMA_PARALLEL=2");
+		expect(next).toContain("LLAMA_FLASH_ATTN=on");
+		expect(next).toContain("PATH=/usr/bin");
+	});
+
+	it("inserta LLAMA_MODEL si no existía previamente", () => {
+		const next = mergeContainerEnv(["FOO=bar"], "gemma4-4b");
+		expect(next).toEqual(["FOO=bar", "LLAMA_MODEL=gemma4-4b"]);
+	});
+});
+
+describe("sanitizeRuntimeEnv", () => {
+	it("expone solo variables LLAMA_* sin secretos", () => {
+		const clean = sanitizeRuntimeEnv({
+			LLAMA_MODEL: "qwen3.5-4b",
+			LLAMA_CTX_SIZE: "16384",
+			LLAMA_API_KEY: "top-secret",
+			API_KEY: "secret",
+			PATH: "/bin",
+		});
+		expect(clean).toEqual({
+			LLAMA_MODEL: "qwen3.5-4b",
+			LLAMA_CTX_SIZE: "16384",
+		});
 	});
 });
 

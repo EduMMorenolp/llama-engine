@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Clonar llama.cpp para herramientas de conversión y quantización
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /src/llama.cpp
 
-# Compilar solo herramientas necesarias (quantize para GGUF)
+# Compilar herramientas necesarias (quantize e imatrix para GGUF)
 RUN cmake -S /src/llama.cpp -B /src/llama.cpp/build \
         -DGGML_CUDA=ON \
         -DCMAKE_BUILD_TYPE=Release \
@@ -19,7 +19,7 @@ RUN cmake -S /src/llama.cpp -B /src/llama.cpp/build \
         -DLLAMA_BUILD_TESTS=OFF \
         -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
         -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
-    && cmake --build /src/llama.cpp/build --config Release --target llama-quantize -j $(nproc)
+    && cmake --build /src/llama.cpp/build --config Release --target llama-quantize llama-imatrix -j $(nproc)
 
 # Instalar dependencias de entrenamiento (HuggingFace stack)
 RUN python3 -m venv /opt/venv
