@@ -23,10 +23,12 @@ mmproj-*.gguf
 data/
 
 # IDE / OS
-.vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
 # Docker
 *.tmp
+
+# Opencode
+opencode.jsonc

@@ -157,9 +157,25 @@ async function bootstrap() {
 		}
 	});
 
+	app.get("/api/datasets/:id/preview", async (req, res) => {
+		try {
+			const limit = String(req.query.limit ?? "");
+			const qs = limit ? `?limit=${encodeURIComponent(limit)}` : "";
+			const response = await fetch(
+				`${config.trainerUrl}/api/datasets/${req.params.id}/preview${qs}`,
+			);
+			const data = await response.json();
+			res.json(data);
+		} catch {
+			res.status(502).json({ error: { message: "Trainer service unavailable" } });
+		}
+	});
+
 	app.delete("/api/datasets/:id", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/datasets/${req.params.id}`, { method: "DELETE" });
+			const response = await fetch(`${config.trainerUrl}/api/datasets/${req.params.id}`, {
+				method: "DELETE",
+			});
 			const data = await response.json();
 			res.json(data);
 		} catch {
@@ -204,7 +220,9 @@ async function bootstrap() {
 
 	app.post("/api/train/jobs/:jobId/stop", async (req, res) => {
 		try {
-			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${req.params.jobId}/stop`, { method: "POST" });
+			const response = await fetch(`${config.trainerUrl}/api/train/jobs/${req.params.jobId}/stop`, {
+				method: "POST",
+			});
 			const data = await response.json();
 			res.json(data);
 		} catch {
@@ -250,7 +268,9 @@ async function bootstrap() {
 			await fs.access(modelPath);
 			res.json({ ok: true, message: `Modelo ${modelName} encontrado en ${config.modelsDir}` });
 		} catch {
-			res.status(404).json({ error: { message: `Modelo ${modelName} no encontrado en ${config.modelsDir}` } });
+			res
+				.status(404)
+				.json({ error: { message: `Modelo ${modelName} no encontrado en ${config.modelsDir}` } });
 		}
 	});
 

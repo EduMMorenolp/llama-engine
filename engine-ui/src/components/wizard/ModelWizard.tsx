@@ -1,16 +1,23 @@
-import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+	type Dataset,
+	deployModel,
+	quantizeModel,
+	startTraining,
+	stopTraining,
+	type TrainingJob,
+} from "../../api";
 import { PageHeader } from "../ui/PageHeader";
-import { WizardStepper, type Step } from "./WizardStepper";
-import { WizardNavigation } from "./WizardNavigation";
-import { FlowSelector } from "./FlowSelector";
-import { BaseModelStep, type BaseModelSelection } from "./BaseModelStep";
-import { DatasetStep, type DatasetInfo } from "./DatasetStep";
-import { TrainingConfigStep, type TrainingConfig } from "./TrainingConfigStep";
-import { TrainingProgressStep } from "./TrainingProgressStep";
-import { QuantizeStep } from "./QuantizeStep";
+import { type BaseModelSelection, BaseModelStep } from "./BaseModelStep";
+import { DatasetStep } from "./DatasetStep";
 import { DeployStep } from "./DeployStep";
-import { startTraining, stopTraining, deployModel, quantizeModel, type TrainingJob } from "../../api";
+import { FlowSelector } from "./FlowSelector";
+import { QuantizeStep } from "./QuantizeStep";
+import { type TrainingConfig, TrainingConfigStep } from "./TrainingConfigStep";
+import { TrainingProgressStep } from "./TrainingProgressStep";
+import { WizardNavigation } from "./WizardNavigation";
+import { type Step, WizardStepper } from "./WizardStepper";
 
 type Flow = "create" | "improve" | "optimize";
 
@@ -39,12 +46,17 @@ const STEPS: Record<Flow, Step[]> = {
 
 export function ModelWizard() {
 	const navigate = useNavigate();
-	const [flow, setFlow] = useState<Flow | null>(null);
+	const [searchParams] = useSearchParams();
+	const [flow, setFlow] = useState<Flow | null>(() => {
+		const f = searchParams.get("flow");
+		return f === "create" || f === "improve" || f === "optimize" ? f : null;
+	});
+	const [initialDatasetId] = useState(() => searchParams.get("datasetId") ?? undefined);
 	const [step, setStep] = useState(0);
 	const [completed, setCompleted] = useState<Set<number>>(new Set());
 
 	const [baseModel, setBaseModel] = useState<BaseModelSelection | null>(null);
-	const [dataset, setDataset] = useState<DatasetInfo | null>(null);
+	const [dataset, setDataset] = useState<Dataset | null>(null);
 	const [config, setConfig] = useState<TrainingConfig>({
 		method: "qlora",
 		epochs: 3,
@@ -56,7 +68,10 @@ export function ModelWizard() {
 	});
 	const [trainJobId, setTrainJobId] = useState<string | null>(null);
 	const [trainJob, setTrainJob] = useState<TrainingJob | undefined>(undefined);
-	const [quantizeResult, setQuantizeResult] = useState<{ method: string; outputSize: number } | null>(null);
+	const [quantizeResult, setQuantizeResult] = useState<{
+		method: string;
+		outputSize: number;
+	} | null>(null);
 	const [busy, setBusy] = useState(false);
 
 	const steps = flow ? STEPS[flow] : [];
@@ -65,10 +80,14 @@ export function ModelWizard() {
 	const canNext = (() => {
 		if (!flow) return false;
 		switch (step) {
-			case 0: return baseModel !== null;
-			case 1: return flow === "optimize" || dataset !== null;
-			case 2: return flow === "optimize";
-			default: return true;
+			case 0:
+				return baseModel !== null;
+			case 1:
+				return flow === "optimize" || dataset !== null;
+			case 2:
+				return flow === "optimize";
+			default:
+				return true;
 		}
 	})();
 
@@ -185,7 +204,7 @@ export function ModelWizard() {
 						/>
 					);
 				}
-				return <DatasetStep value={dataset} onChange={setDataset} />;
+				return <DatasetStep value={dataset} onChange={setDataset} preselectId={initialDatasetId} />;
 			case 2:
 				if (flow === "optimize") {
 					return (
@@ -219,7 +238,9 @@ export function ModelWizard() {
 						<QuantizeStep
 							modelId={trainJobId ?? baseModel?.id ?? ""}
 							modelSize={0}
-							onComplete={(result) => handleQuantize(trainJobId ?? baseModel?.id ?? "", result.method)}
+							onComplete={(result) =>
+								handleQuantize(trainJobId ?? baseModel?.id ?? "", result.method)
+							}
 						/>
 					);
 				}
@@ -270,9 +291,7 @@ export function ModelWizard() {
 				<div className="wizard">
 					<WizardStepper steps={steps} current={step} completed={completed} />
 
-					<div className="wizard-content">
-						{renderStep()}
-					</div>
+					<div className="wizard-content">{renderStep()}</div>
 
 					{!(step === totalSteps - 1 && flow === "optimize") && (
 						<WizardNavigation

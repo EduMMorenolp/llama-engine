@@ -94,6 +94,57 @@ def validate_dataset(dataset_id: str):
     return jsonify({"error": "Dataset not found"}), 404
 
 
+@app.route("/api/datasets/<dataset_id>/preview", methods=["GET"])
+def preview_dataset(dataset_id: str):
+    try:
+        limit = max(1, min(int(request.args.get("limit", 3)), 20))
+    except (TypeError, ValueError):
+        limit = 3
+    ds_dir = Path(DATA_DIR) / "datasets"
+    for ext in (".jsonl", ".json"):
+        p = ds_dir / f"{dataset_id}{ext}"
+        if p.exists():
+            return jsonify(preview_file(p, limit))
+    return jsonify({"error": "Dataset not found"}), 404
+
+
+def preview_file(path: Path, limit: int) -> dict:
+    fmt = "unknown"
+    items = []
+    with path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if fmt == "unknown":
+                fmt = detect_format_string(obj)
+            items.extend(preview_example(obj, fmt))
+            if len(items) >= limit:
+                break
+    return {"format": fmt, "examples": items[:limit]}
+
+
+def preview_example(obj: dict, fmt: str) -> list:
+    out = []
+    if fmt == "ShareGPT":
+        for c in (obj.get("conversations") or [])[:2]:
+            out.append({"role": c.get("from", "unknown"), "content": str(c.get("value", ""))})
+    elif fmt == "OpenAI":
+        for m in (obj.get("messages") or [])[:2]:
+            out.append({"role": m.get("role", "unknown"), "content": str(m.get("content", ""))})
+    elif fmt == "Alpaca":
+        out.append({"role": "user", "content": str(obj.get("instruction", ""))})
+        if obj.get("output"):
+            out.append({"role": "assistant", "content": str(obj.get("output", ""))})
+    else:
+        out.append({"role": "unknown", "content": json.dumps(obj, ensure_ascii=False)[:200]})
+    return out
+
+
 def detect_format(path: Path) -> str:
     try:
         with path.open() as f:

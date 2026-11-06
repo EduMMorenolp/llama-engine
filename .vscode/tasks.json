@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "api: dev",
+			"type": "npm",
+			"script": "dev",
+			"options": { "cwd": "${workspaceFolder}/engine-api" },
+			"presentation": { "group": "api" }
+		},
+		{
+			"label": "api: check",
+			"type": "npm",
+			"script": "check",
+			"options": { "cwd": "${workspaceFolder}/engine-api" },
+			"group": { "kind": "build", "isDefault": true }
+		},
+		{
+			"label": "ui: dev",
+			"type": "npm",
+			"script": "dev",
+			"options": { "cwd": "${workspaceFolder}/engine-ui" },
+			"presentation": { "group": "ui" }
+		},
+		{
+			"label": "ui: build",
+			"type": "npm",
+			"script": "build",
+			"options": { "cwd": "${workspaceFolder}/engine-ui" },
+			"group": "build"
+		},
+		{
+			"label": "compose: up",
+			"type": "shell",
+			"command": "docker compose up -d --build",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra" }
+		},
+		{
+			"label": "compose: down",
+			"type": "shell",
+			"command": "docker compose down",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra" }
+		}
+	]
+}

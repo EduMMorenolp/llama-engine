@@ -49,9 +49,12 @@ Web de telemetría: http://localhost:3051
 La web incluye un botón **i** (información) con specs del sistema en vivo, changelog de versiones y
 manual de uso.
 
-## Integración con opencode
+## Integración con agentes
 
-Este motor es compatible con opencode vía proveedor OpenAI-compatible. Ver [`docs/INTEGRACION-OPENCODE.md`](./docs/INTEGRACION-OPENCODE.md).
+Este motor es compatible con **opencode** y **Hermes** vía proveedor OpenAI-compatible (`/v1`):
+
+- **opencode**: [`docs/INTEGRACION-OPENCODE.md`](./docs/INTEGRACION-OPENCODE.md)
+- **Hermes**: [`docs/INTEGRACION-HERMES.md`](./docs/INTEGRACION-HERMES.md)
 
 ## Estructura
 
@@ -62,7 +65,7 @@ llama-engine/
 ├── engine-api/             # wrapper API (src/{main,config,env,runtime,models,proxy,status,middleware})
 ├── engine-ui/              # SPA de telemetría
 ├── models/                 # GGUFs montados (gitignored)
-└── docs/                   # ARQUITECTURA, INSTALL, INTEGRACION-OPENCODE
+└── docs/                   # ARQUITECTURA, INSTALL, INTEGRACION-OPENCODE, INTEGRACION-HERMES
 ```
 
 ## Requisitos

@@ -24,6 +24,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
+- **docs**: Nueva guía [`docs/INTEGRACION-HERMES.md`](./docs/INTEGRACION-HERMES.md) para usar el motor como proveedor local de **Hermes Agent** (bloque `providers:` + `model_aliases:` en `config.yaml`), con selección vía `--provider`/`/model`, notas de thinking/tool-calling y troubleshooting.
 - **engine-agent** (nuevo servicio de agente autónomo):
   - Bucle de razonamiento interactivo y ejecución autónoma de herramientas (`src/agent/loop.ts`).
   - Base de datos SQLite integrada con historial de sesiones y memorias persistentes (`src/sessions/`, `src/modules/memories/`).
@@ -57,6 +58,13 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   - `POST /api/train/start`, `GET /api/train/jobs`, `GET /api/train/jobs/:jobId`
   - `POST /api/quantize`, `GET /api/quantize/methods`
   - `POST /api/models/deploy`
+
+- **engine-ui**: Pantalla DataSets (nueva ruta `/datasets`) con biblioteca de datasets de entrenamiento:
+  - Subida de archivos `.jsonl`/`.json` al trainer (formatos ShareGPT, OpenAI y Alpaca) con validación, previsualización, borrado y estado por dataset.
+  - Botones "Crear modelo" / "Mejorar modelo" que abren el asistente con el dataset preseleccionado (`/modelos/crear?flow=…&datasetId=…`).
+  - El paso Dataset del asistente ahora elige de la biblioteca o sube un archivo nuevo; antes solo se parseaba en el navegador y el archivo nunca se persistía en el trainer.
+- **engine-api**: Nuevo proxy `GET /api/datasets/:id/preview?limit=N` hacia el trainer para previsualizar datasets guardados.
+- **llama-trainer**: Nuevo endpoint `GET /api/datasets/<id>/preview` que devuelve hasta N turnos normalizados (ShareGPT/OpenAI/Alpaca).
 
 ### Fixed
 - **llama-runtime**: crash-loop por `--flash-attn` sin valor. La versión actual de llama-server exige

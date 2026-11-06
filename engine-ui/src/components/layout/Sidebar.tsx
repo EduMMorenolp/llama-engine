@@ -5,6 +5,7 @@ const NAV_ITEMS = [
 	{ to: "/", label: "Dashboard", end: true },
 	{ to: "/modelos", label: "Modelos", end: false },
 	{ to: "/modelos/crear", label: "Crear Modelo", end: false },
+	{ to: "/datasets", label: "DataSets", end: false },
 	{ to: "/runtime", label: "Runtime", end: false },
 	{ to: "/telemetria", label: "Telemetría", end: false },
 	{ to: "/ayuda", label: "Ayuda", end: false },
@@ -18,6 +19,8 @@ function bulletFor(path: string): string {
 			return "▤";
 		case "/modelos/crear":
 			return "✦";
+		case "/datasets":
+			return "🗂";
 		case "/runtime":
 			return "⚙";
 		case "/telemetria":

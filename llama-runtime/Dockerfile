@@ -1,45 +1,50 @@
-# llama-runtime — llama.cpp (llama-server) compilado con CUDA 12.8 + soporte Blackwell (sm_120)
-# La imagen oficial se compila con CUDA 12.4 (sin kernels sm_120), por eso build desde fuente.
+# llama-runtime — llama.cpp con CUDA y soporte Blackwell
 
-# ---------- Etapa build ----------
-FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04 AS build
+ARG CUDA_IMAGE=nvidia/cuda:12.8.0
 
-# Build tools + llama.cpp
+# ---------- Etapa de compilacion ----------
+FROM ${CUDA_IMAGE}-cudnn-devel-ubuntu22.04 AS build
+
+ARG SM_CUDA_ARCHITECTURES=120
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git cmake build-essential curl \
+        git cmake build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Compilar con arquitectura Blackwell (rtx 50xx) y flash attention.
-# sm_120 = RTX 5090/5080/5070/5050 (compute capability 12.0).
-RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /src \
-    && cmake -S /src -B /src/build \
+RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /src/llama.cpp
+
+RUN cmake -S /src/llama.cpp -B /src/llama.cpp/build \
         -DGGML_CUDA=ON \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_CUDA_ARCHITECTURES=120 \
         -DGGML_CUDA_FA=ON \
         -DGGML_CUDA_FA_ALL_QUANTS=ON \
-        -DLLAMA_CURL=ON \
+        -DCMAKE_CUDA_ARCHITECTURES=${SM_CUDA_ARCHITECTURES} \
+        -DCMAKE_BUILD_TYPE=Release \
         -DLLAMA_BUILD_TESTS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
         -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
         -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
-    && cmake --build /src/build --config Release -j $(nproc) \
-    && cmake --install /src/build --prefix /out
+    && cmake --build /src/llama.cpp/build --config Release --target llama-server -j "$(nproc)" \
+    && mkdir -p /opt/llama/bin /opt/llama/lib \
+    && cp /src/llama.cpp/build/bin/llama-server /opt/llama/bin/ \
+    && cp /src/llama.cpp/build/bin/*.so* /opt/llama/lib/
 
 # ---------- Etapa runtime ----------
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+FROM ${CUDA_IMAGE}-runtime-ubuntu22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libgomp1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /models /workspace
+        bash libgomp1 curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /out/bin/ /usr/local/bin/
-COPY --from=build /out/lib/ /usr/local/lib/
-ENV LD_LIBRARY_PATH=/usr/local/lib
+COPY --from=build /opt/llama/ /usr/local/
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN mkdir -p /models \
+    && chmod +x /usr/local/bin/entrypoint.sh
+
+ENV PATH="/usr/local/bin:${PATH}" \
+    LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
 WORKDIR /workspace
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint.sh"]

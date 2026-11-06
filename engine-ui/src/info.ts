@@ -90,19 +90,26 @@ export const MANUAL: ManualSection[] = [
 					"Specs del sistema (versión, uptime, modelo), panel GPU detallado (VRAM, temperatura, potencia, uso) y gráfico de historial de tok/s acumulado durante la sesión.",
 				],
 			},
-		{
-			heading: "Crear Modelo",
-			body: [
-				"Asistente paso a paso para crear, mejorar u optimizar modelos.",
-				"Tres flujos disponibles: crear desde cero (con dataset propio), mejorar un modelo existente con nuevos ejemplos, u optimizar rendimiento mediante quantización.",
-				"Soporta entrenamiento QLoRA, LoRA y full fine-tuning con monitoreo de loss y epochs en tiempo real.",
-			],
-		},
-		{
-			heading: "Ayuda",
-			body: ["Esta página: historial de versiones y manual de uso."],
-		},
-	],
+			{
+				heading: "Crear Modelo",
+				body: [
+					"Asistente paso a paso para crear, mejorar u optimizar modelos.",
+					"Tres flujos disponibles: crear desde cero (con dataset propio), mejorar un modelo existente con nuevos ejemplos, u optimizar rendimiento mediante quantización.",
+					"Soporta entrenamiento QLoRA, LoRA y full fine-tuning con monitoreo de loss y epochs en tiempo real.",
+				],
+			},
+			{
+				heading: "DataSets",
+				body: [
+					"Biblioteca de datasets de entrenamiento. Subí archivos .jsonl (ShareGPT, OpenAI o Alpaca) y quedan guardados en el trainer.",
+					"Cada dataset se puede validar, previsualizar y borrar. Desde acá podés iniciar un entrenamiento con 'Crear modelo' o 'Mejorar modelo'.",
+				],
+			},
+			{
+				heading: "Ayuda",
+				body: ["Esta página: historial de versiones y manual de uso."],
+			},
+		],
 	},
 	{
 		title: "Usar el motor desde tu código",
@@ -166,10 +173,17 @@ export const MANUAL: ManualSection[] = [
 		title: "Entrenar un modelo",
 		blocks: [
 			{
+				heading: "DataSets",
+				body: [
+					"Administrá tus datasets desde la pantalla DataSets: subí el archivo, validalo y previsualizá los primeros ejemplos.",
+					"Desde cada dataset, 'Crear modelo' o 'Mejorar modelo' abren el asistente con ese dataset ya seleccionado.",
+				],
+			},
+			{
 				heading: "Flujo crear desde cero",
 				body: [
 					"1. Elegí un modelo base desde Hugging Face o tu registry local.",
-					"2. Subí un dataset en formato JSONL (ShareGPT, OpenAI o Alpaca).",
+					"2. Elegí un dataset de tu biblioteca (pantalla DataSets) o subí uno nuevo en formato JSONL (ShareGPT, OpenAI o Alpaca).",
 					"3. Configurá el método de entrenamiento (QLoRA recomendado para GPUs con VRAM limitada).",
 					"4. Monitoreá el progreso: loss por epoch, líneas de log, barra de progreso.",
 					"5. Quantizá el modelo entrenado (Q4_K_M recomendado para balance tamaño/calidad).",
@@ -210,9 +224,9 @@ export const MANUAL: ManualSection[] = [
 					"· 401: la x-api-key debe coincidir con la API_KEY del .env.",
 					"· GPU no disponible: revisá que nvidia-container-toolkit esté instalado y que la opción runtime: nvidia esté activa.",
 					"· Primer prompt lento: es el warmup del modelo; con GGUF cuantizado (p.ej. Q4_K_M) es más rápido.",
-				"· Trainer no responde: verificá que el contenedor llama-trainer esté corriendo con docker compose ps.",
-				"· Error 'No module named trainer': reconstruí el contenedor con docker compose build llama-trainer.",
-				"· GPU insuficiente para entrenamiento: QLoRA requiere ~6 GB VRAM para modelos 7B; reduce batch_size o max_seq_len.",
+					"· Trainer no responde: verificá que el contenedor llama-trainer esté corriendo con docker compose ps.",
+					"· Error 'No module named trainer': reconstruí el contenedor con docker compose build llama-trainer.",
+					"· GPU insuficiente para entrenamiento: QLoRA requiere ~6 GB VRAM para modelos 7B; reduce batch_size o max_seq_len.",
 				],
 			},
 		],

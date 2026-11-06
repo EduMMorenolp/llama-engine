@@ -203,6 +203,20 @@ export async function validateDataset(id: string): Promise<ValidationResult> {
 	return get(`/api/datasets/${id}/validate`);
 }
 
+export interface DatasetPreviewItem {
+	role: string;
+	content: string;
+}
+
+export interface DatasetPreview {
+	format: string;
+	examples: DatasetPreviewItem[];
+}
+
+export async function previewDataset(id: string, limit = 3): Promise<DatasetPreview> {
+	return get(`/api/datasets/${encodeURIComponent(id)}/preview?limit=${limit}`);
+}
+
 export async function deleteDataset(id: string): Promise<void> {
 	const res = await fetch(`${API_URL}/api/datasets/${id}`, {
 		method: "DELETE",
