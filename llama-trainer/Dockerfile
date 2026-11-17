@@ -21,18 +21,21 @@ RUN cmake -S /src/llama.cpp -B /src/llama.cpp/build \
         -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
     && cmake --build /src/llama.cpp/build --config Release --target llama-quantize llama-imatrix -j $(nproc)
 
-# Instalar dependencias de entrenamiento (HuggingFace stack)
+# Instalar dependencias de entrenamiento (HuggingFace stack con caché de pip BuildKit)
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch --index-url https://download.pytorch.org/whl/cu128
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
     transformers>=4.45.0 \
     datasets>=3.0.0 \
     peft>=0.13.0 \
     accelerate>=1.0.0 \
     trl>=0.12.0 \
-    bitsandbytes>=0.44.0
-RUN pip install --no-cache-dir flask>=3.0.0 flask-cors>=4.0.0
+    bitsandbytes>=0.44.0 \
+    flask>=3.0.0 \
+    flask-cors>=4.0.0
 
 # Copiar package del trainer
 COPY trainer/ /workspace/trainer/

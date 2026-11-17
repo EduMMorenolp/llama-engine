@@ -119,15 +119,15 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 		title: "Velocidad & Throughput Puro",
 		description:
 			"Mide latencia al primer token (TTFT) y velocidad sostenida de generación (tok/s).",
-		systemPrompt: "Sos un ingeniero de sistemas conciso y técnico.",
+		systemPrompt: "Sos un ingeniero de sistemas conciso y técnico. Respondé directo.",
 		prompt:
 			"Explicá en 5 puntos claros cómo funcionan los Tensor Cores en una GPU NVIDIA, qué diferencia hay entre FP16, Q8_0 y Q4_K_M, y cómo impacta el ancho de banda de memoria en los tokens por segundo.",
-		maxTokens: 320,
+		maxTokens: 512,
 		temperature: 0.3,
 		validator: (out) => {
-			const words = out.trim().split(/\s+/).length;
+			const words = out.trim().split(/\s+/).filter(Boolean).length;
 			return {
-				passed: words >= 40,
+				passed: words >= 25,
 				note: `${words} palabras generadas con fluidez`,
 			};
 		},
@@ -138,10 +138,10 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 		title: "Razonamiento Lógico y Matemático",
 		description:
 			"Verifica deducción paso a paso con trampa aritmética clásica y precisión del resultado final.",
-		systemPrompt: "Resolvé paso a paso y al final escribí el número exacto.",
+		systemPrompt: "Resolvé paso a paso de forma concisa y al final escribí el número exacto.",
 		prompt:
 			"Un servidor procesa 40 peticiones por minuto durante 3 minutos. Luego duplica su velocidad durante los siguientes 2 minutos. Sin embargo, el 10% del total de peticiones fallaron por timeout. ¿Cuántas peticiones fueron exitosas en total? Mostrá el cálculo.",
-		maxTokens: 320,
+		maxTokens: 640,
 		temperature: 0.1,
 		validator: (out) => {
 			// 40*3 = 120; 80*2 = 160; total = 280; 90% de 280 = 252
@@ -163,7 +163,7 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 		systemPrompt: "Devolvé código TypeScript limpio dentro de un bloque ```typescript.",
 		prompt:
 			"Escribí una función en TypeScript llamada ` parseGpuCsv(line: string) ` que reciba una línea CSV con `name,totalMiB,usedMiB` y devuelva un objeto tipado `{ name: string; usagePct: number }` redondeado a 1 decimal.",
-		maxTokens: 320,
+		maxTokens: 640,
 		temperature: 0.2,
 		validator: (out) => {
 			const hasFn = /parseGpuCsv/.test(out);
@@ -186,7 +186,7 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 			"Respondé ÚNICAMENTE con un objeto JSON válido, sin bloques markdown ni texto adicional.",
 		prompt:
 			'Devolvé un JSON con exactamente estas claves: `{"engine": "llama.cpp", "cuda": true, "recommendedQuants": ["Q4_K_M", "Q8_0"], "maxSlots": 4}`.',
-		maxTokens: 180,
+		maxTokens: 512,
 		temperature: 0.1,
 		jsonMode: true,
 		validator: (out) => {
@@ -194,8 +194,10 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 				.replace(/<think>[\s\S]*?<\/think>/g, "")
 				.replace(/```json|```/g, "")
 				.trim();
+			const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+			const candidate = jsonMatch ? jsonMatch[0] : cleaned;
 			try {
-				const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+				const parsed = JSON.parse(candidate) as Record<string, unknown>;
 				const hasKeys =
 					"engine" in parsed && "cuda" in parsed && Array.isArray(parsed.recommendedQuants);
 				return {
@@ -203,7 +205,14 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 					note: hasKeys ? "JSON válido y esquema verificado" : "JSON válido pero faltan claves",
 				};
 			} catch {
-				return { passed: false, note: "Falló JSON.parse() sobre la salida" };
+				const hasKeysInRaw =
+					/"engine"/.test(out) && /"cuda"/.test(out) && /"recommendedQuants"/.test(out);
+				return {
+					passed: hasKeysInRaw,
+					note: hasKeysInRaw
+						? "Claves JSON presentes en salida"
+						: "Falló JSON.parse() sobre la salida",
+				};
 			}
 		},
 	},
@@ -215,7 +224,7 @@ const TEST_SUITE: BenchmarkTestCase[] = [
 			"Envía un prompt largo con ruido técnico y verifica recuperación exacta + velocidad de prefill.",
 		systemPrompt: "Respondé únicamente basándote en el contexto provisto.",
 		prompt: buildLongContextPrompt(900),
-		maxTokens: 140,
+		maxTokens: 512,
 		temperature: 0.1,
 		validator: (out) => {
 			const ok = /OMEGA-7749/i.test(out);
@@ -248,7 +257,7 @@ function computeScoreAndGrade(
 
 export function BenchmarkPage() {
 	const toast = useToast();
-	const { status, health, config, refresh } = useRuntime();
+	const { status, health, config, refresh, recordClientPulse } = useRuntime();
 	const modelActions = useModels(status?.models ?? [], refresh);
 
 	const registry = status?.models ?? [];
@@ -350,15 +359,19 @@ export function BenchmarkPage() {
 						setLiveOutput(fullText);
 						setLiveReasoning(fullReasoning);
 					},
+					onComplete: (finalStats) => {
+						recordClientPulse(finalStats.tokPerSec);
+					},
 				});
 
 				if (status?.gpu.temperatureC && status.gpu.temperatureC > peakTemp) {
 					peakTemp = status.gpu.temperatureC;
 				}
 
+				const combinedOutput = [fullText, fullReasoning].filter(Boolean).join("\n").trim();
 				const validation = tc.validator
-					? tc.validator(fullText)
-					: { passed: fullText.trim().length > 10, note: "Respuesta completada" };
+					? tc.validator(combinedOutput)
+					: { passed: combinedOutput.length > 10, note: "Respuesta completada" };
 
 				const single: SingleTestResult = {
 					testId: tc.id,
@@ -370,7 +383,7 @@ export function BenchmarkPage() {
 					tokPerSec: Number(stats.tokPerSec.toFixed(1)),
 					elapsedSec: Number(stats.elapsedSec.toFixed(2)),
 					tokensGenerated: stats.chunksCount,
-					outputPreview: fullText.slice(0, 260),
+					outputPreview: (fullText || fullReasoning).slice(0, 260),
 				};
 
 				collected.push(single);

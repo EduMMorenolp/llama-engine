@@ -95,6 +95,7 @@ services:
       - ./data/base:/data/base
       - ./data/output:/data/output
       - ./models:/models:rw
+      - ./llama-trainer/trainer:/workspace/trainer:ro
     ports:
       - "127.0.0.1:${TRAINER_PORT:-8081}:8081"
     networks:

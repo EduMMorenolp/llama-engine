@@ -11,7 +11,8 @@ import { Topbar } from "./Topbar";
 function LayoutInner() {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [paletteOpen, setPaletteOpen] = useState(false);
-	const { status, health, error, loading, refresh, pollMs, paused, lastUpdated } = useRuntime();
+	const { status, health, error, loading, refresh, pollMs, paused, lastUpdated, wsConnected } =
+		useRuntime();
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -65,7 +66,9 @@ function LayoutInner() {
 							? "conectando…"
 							: paused
 								? "motor llama.cpp · telemetría en pausa"
-								: `motor llama.cpp · telemetría cada ${pollMs / 1000}s`}
+								: wsConnected
+									? `motor llama.cpp · ⚡ WebSocket Live (${pollMs / 1000}s)`
+									: `motor llama.cpp · HTTP Poll (${pollMs / 1000}s)`}
 					</span>
 					{lastUpdated ? (
 						<span className="foot-sep">· actualizado {fmtTime(lastUpdated)}</span>

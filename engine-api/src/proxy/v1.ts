@@ -4,13 +4,18 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import type { AppConfig } from "../config.js";
 import type { ModelRegistry } from "../models/registry.js";
+import type { StatusService } from "../status/index.js";
 
 /**
  * Proxy transparente hacia la API OpenAI-compatible de llama-server.
- * Reenvía /v1/* (chat/completions, embeddings, models) al runtime con streaming SSE.
- * /v1/models se maneja localmente devolviendo todos los modelos del registro.
+ * Reenvía /v1/* (chat/completions, embeddings, models) al runtime con streaming SSE
+ * y registra métricas de velocidad (tok/s) en vivo en StatusService.
  */
-export function createV1Proxy(config: AppConfig, registry: ModelRegistry): Router {
+export function createV1Proxy(
+	config: AppConfig,
+	registry: ModelRegistry,
+	statusService?: StatusService,
+): Router {
 	const router = Router();
 
 	// GET /v1/models — todos los modelos del registro en formato OpenAI
@@ -29,34 +34,68 @@ export function createV1Proxy(config: AppConfig, registry: ModelRegistry): Route
 
 	// Proxy del resto de /v1/*
 	router.use("/v1", (req, res) => {
-		// El runtime usa la misma ruta (el prefijo /v1 no se monta en un sub-path)
-		proxyRequest(config, req, res);
+		proxyRequest(config, req, res, statusService);
 	});
 
 	return router;
 }
 
-function proxyRequest(config: AppConfig, req: Request, res: Response): void {
-	const path = req.originalUrl; // ej: /v1/chat/completions
+function proxyRequest(
+	config: AppConfig,
+	req: Request,
+	res: Response,
+	statusService?: StatusService,
+): void {
+	const path = req.originalUrl;
 	const target = new URL(`${config.runtimeUrl}${path}`);
 
-	// No reenviar credenciales del cliente al upstream (el runtime no las necesita).
 	const headers: Record<string, string | string[] | undefined> = stripUpstreamCredentials(
 		req.headers,
 	);
 
-	// express.json() ya consumió el stream del request, así que re-emitimos el body
-	// desde req.body con content-length explícito (el runtime no parsea chunked).
 	let payload: Buffer | null = null;
+	let requestedModel = "";
 	if (req.body != null) {
+		if (!Buffer.isBuffer(req.body) && typeof req.body === "object") {
+			requestedModel = String((req.body as { model?: string }).model ?? "");
+		}
 		payload = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body), "utf8");
 		headers["content-length"] = String(payload.length);
 	}
 
+	const startedAt = Date.now();
+	let firstTokenAt: number | null = null;
+	let sseEvents = 0;
+
 	const upstreamReq = http.request(target, { method: req.method, headers }, (upstreamRes) => {
 		res.statusCode = upstreamRes.statusCode ?? 502;
-		res.setHeader("content-type", upstreamRes.headers["content-type"] ?? "application/json");
+		const contentType = upstreamRes.headers["content-type"] ?? "application/json";
+		res.setHeader("content-type", contentType);
 		res.setHeader("cache-control", upstreamRes.headers["cache-control"] ?? "no-store");
+
+		if (statusService && contentType.includes("text/event-stream")) {
+			upstreamRes.on("data", (chunk: Buffer) => {
+				const text = chunk.toString("utf8");
+				const matches = text.match(/data:\s*\{/g);
+				if (matches && matches.length > 0) {
+					const now = Date.now();
+					if (firstTokenAt === null) firstTokenAt = now;
+					sseEvents += matches.length;
+					const genSec = Math.max(0.15, (now - firstTokenAt) / 1000);
+					const prefillSec = Math.max(0.05, (firstTokenAt - startedAt) / 1000);
+					statusService.recordInferencePulse({
+						model: requestedModel,
+						promptN: Math.max(16, Math.round((payload?.length ?? 64) / 4)),
+						predictedN: sseEvents,
+						promptPerSec: Number(
+							(Math.max(16, (payload?.length ?? 64) / 4) / prefillSec).toFixed(1),
+						),
+						predictedPerSec: Number((sseEvents / genSec).toFixed(1)),
+					});
+				}
+			});
+		}
+
 		upstreamRes.pipe(res);
 	});
 
@@ -74,8 +113,7 @@ function proxyRequest(config: AppConfig, req: Request, res: Response): void {
 
 /**
  * Copia de los headers del request dejando fuera las credenciales del cliente
- * (authorization / x-api-key). El runtime llama-server no las necesita y reenviarlas
- * fuga la API key del cliente hacia el upstream.
+ * (authorization / x-api-key).
  */
 export function stripUpstreamCredentials(
 	headers: Record<string, string | string[] | undefined>,
@@ -84,8 +122,6 @@ export function stripUpstreamCredentials(
 		"content-type": headers["content-type"] ?? "application/json",
 		accept: headers.accept ?? "application/json",
 	};
-	// Preservar content-length: reenviamos el body tal cual via pipe, así el
-	// runtime recibe el body completo en lugar de chunked (llama-server no lo parsea).
 	if (headers["content-length"]) {
 		stripped["content-length"] = headers["content-length"];
 	}

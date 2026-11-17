@@ -21,6 +21,7 @@ import {
 	trainStartBodySchema,
 } from "./schemas.js";
 import { StatusService } from "./status/index.js";
+import { TelemetryWsHub } from "./ws/telemetry.js";
 
 /**
  * Expone solo vars LLAMA_* del contenedor. Nunca apiKey ni ninguna env que
@@ -64,6 +65,7 @@ async function bootstrap() {
 	const runtime = new RuntimeManager(config);
 	const status = new StatusService(config, runtime, registry);
 	const hub = new HuggingFaceHub(config);
+	const wsHub = new TelemetryWsHub(config, runtime, status);
 
 	const app = express();
 	app.set("trust proxy", 1);
@@ -125,6 +127,7 @@ async function bootstrap() {
 			return;
 		}
 		const saved = registry.savePreset(id, parsed.data);
+		void wsHub.broadcastSnapshotNow();
 		res.json({ ok: true, modelId: id, preset: saved });
 	});
 
@@ -142,6 +145,7 @@ async function bootstrap() {
 		try {
 			const includeMmproj = req.query.includeMmproj === "true";
 			const { deletedFiles } = registry.deleteModel(id, includeMmproj);
+			void wsHub.broadcastSnapshotNow();
 			res.json({
 				ok: true,
 				deletedFiles,
@@ -168,11 +172,13 @@ async function bootstrap() {
 		// Fusionar el preset guardado del modelo con los overrides enviados en el request
 		const mergedOpts = { ...(model.preset ?? {}), ...opts };
 		const result = await runtime.reload(modelId, mergedOpts);
+		void wsHub.broadcastSnapshotNow();
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
 	app.post("/api/runtime/restart", async (_req, res) => {
 		const result = await runtime.restart();
+		void wsHub.broadcastSnapshotNow();
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
@@ -210,11 +216,13 @@ async function bootstrap() {
 
 	app.post("/api/runtime/stop", async (_req, res) => {
 		const result = await runtime.stop();
+		void wsHub.broadcastSnapshotNow();
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
 	app.post("/api/runtime/start", async (_req, res) => {
 		const result = await runtime.start();
+		void wsHub.broadcastSnapshotNow();
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
@@ -512,7 +520,7 @@ async function bootstrap() {
 
 	// ---- Proxy OpenAI /v1 (auth) ----
 	app.use(requireAuth);
-	app.use(createV1Proxy(config, registry));
+	app.use(createV1Proxy(config, registry, status));
 
 	// ---- Not found + error ----
 	app.use((_req, res) => {
@@ -523,10 +531,11 @@ async function bootstrap() {
 		res.status(500).json({ error: { message: "Internal server error" } });
 	});
 
-	app.listen(config.port, () => {
-		console.log(`[engine-api] escuchando en :${config.port}`);
+	const server = app.listen(config.port, () => {
+		console.log(`[engine-api] escuchando en :${config.port} (HTTP + WebSocket /api/ws)`);
 		console.log(`[engine-api] runtime: ${config.runtimeUrl} (${config.runtimeContainer})`);
 	});
+	wsHub.attach(server);
 }
 
 if (process.env.VITEST !== "true") {

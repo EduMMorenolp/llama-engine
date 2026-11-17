@@ -210,15 +210,33 @@ export class RuntimeManager {
 
 function collectExecOutput(stream: NodeJS.ReadableStream, timeoutMs: number): Promise<string> {
 	return new Promise((resolve) => {
-		let out = "";
-		const timer = setTimeout(() => resolve(out), timeoutMs);
-		const done = () => {
+		const chunks: Buffer[] = [];
+		const timer = setTimeout(() => finish(), timeoutMs);
+		const finish = () => {
 			clearTimeout(timer);
-			resolve(out);
+			const raw = Buffer.concat(chunks);
+			// Si el buffer usa el protocolo multiplexado de Docker (byte 0 = 1|2, bytes 1..3 = 0), demultiplexarlo
+			if (
+				raw.length >= 8 &&
+				(raw[0] === 1 || raw[0] === 2) &&
+				raw[1] === 0 &&
+				raw[2] === 0 &&
+				raw[3] === 0
+			) {
+				const demux = demultiplexLogs([raw]);
+				if (demux) {
+					resolve(demux);
+					return;
+				}
+			}
+			// Fallback: limpiar cualquier carácter de control no imprimible al inicio
+			resolve(raw.toString("utf8").replace(/^[^\x20-\x7E]+/, ""));
 		};
-		stream.on("data", (chunk: Buffer) => (out += chunk.toString()));
-		stream.on("end", done);
-		stream.on("error", done);
+		stream.on("data", (chunk: Buffer) =>
+			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+		);
+		stream.on("end", finish);
+		stream.on("error", finish);
 	});
 }
 

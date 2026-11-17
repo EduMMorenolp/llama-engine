@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeRuntimeEnv } from "../src/main.js";
 import { demultiplexLogs, mergeContainerEnv } from "../src/runtime/manager.js";
+import { decodeWsClientFrames, encodeWsTextFrame } from "../src/ws/telemetry.js";
 
 describe("demultiplexLogs", () => {
 	it("demultiplexa frames stdout y stderr (frame type ignorado)", () => {
@@ -66,6 +67,35 @@ describe("sanitizeRuntimeEnv", () => {
 			LLAMA_MODEL: "qwen3.5-4b",
 			LLAMA_CTX_SIZE: "16384",
 		});
+	});
+});
+
+describe("WebSocket RFC 6455 codec", () => {
+	it("codifica frames de texto cortos y medianos", () => {
+		const shortFrame = encodeWsTextFrame("hola");
+		expect(shortFrame[0]).toBe(0x81);
+		expect(shortFrame[1]).toBe(4);
+		expect(shortFrame.subarray(2).toString("utf8")).toBe("hola");
+
+		const mediumPayload = "x".repeat(300);
+		const medFrame = encodeWsTextFrame(mediumPayload);
+		expect(medFrame[0]).toBe(0x81);
+		expect(medFrame[1]).toBe(126);
+		expect(medFrame.readUInt16BE(2)).toBe(300);
+		expect(medFrame.subarray(4).toString("utf8")).toBe(mediumPayload);
+	});
+
+	it("decodifica frames enmascarados del cliente y detecta close", () => {
+		const mask = Buffer.from([0x12, 0x34, 0x56, 0x78]);
+		const raw = Buffer.from('{"type":"refresh"}', "utf8");
+		const masked = Buffer.from(raw);
+		for (let i = 0; i < masked.length; i++) {
+			masked[i] ^= mask[i & 3];
+		}
+		const clientFrame = Buffer.concat([Buffer.from([0x81, 0x80 | raw.length]), mask, masked]);
+		const parsed = decodeWsClientFrames(clientFrame);
+		expect(parsed.closed).toBe(false);
+		expect(parsed.messages).toEqual(['{"type":"refresh"}']);
 	});
 });
 

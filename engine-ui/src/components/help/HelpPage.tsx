@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { API_KEY, API_URL } from "../../api";
+import { getApiKey, getApiUrl } from "../../api";
 import { useToast } from "../../context/ToastContext";
 import { useRuntime } from "../../hooks/useRuntime";
 import { CHANGELOG, MANUAL } from "../../info";
@@ -7,7 +7,7 @@ import { Button } from "../ui/Button";
 import { IconCopy, IconSearch } from "../ui/Icons";
 import { PageHeader, PageSection } from "../ui/PageHeader";
 
-type SnippetKey = "curl" | "python" | "typescript" | "opencode" | "hermes";
+type SnippetKey = "curl" | "python" | "typescript" | "websocket" | "opencode" | "hermes";
 
 export function HelpPage() {
 	const { status } = useRuntime();
@@ -16,12 +16,14 @@ export function HelpPage() {
 	const [searchQuery, setSearchQuery] = useState("");
 
 	const activeModel = status?.loadedModel || "qwen3.5-4b";
-	const apiKeySample = API_KEY || "llama-engine-dev";
+	const apiUrl = getApiUrl();
+	const wsUrl = apiUrl.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
+	const apiKeySample = getApiKey() || "llama-engine-dev";
 
 	const snippets: Record<SnippetKey, { label: string; code: string }> = {
 		curl: {
 			label: "cURL (Streaming Chat)",
-			code: `curl -X POST ${API_URL}/v1/chat/completions \\
+			code: `curl -X POST ${apiUrl}/v1/chat/completions \\
   -H "x-api-key: ${apiKeySample}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -38,7 +40,7 @@ export function HelpPage() {
 			code: `from openai import OpenAI
 
 client = OpenAI(
-    base_url="${API_URL}/v1",
+    base_url="${apiUrl}/v1",
     api_key="${apiKeySample}",
 )
 
@@ -53,7 +55,7 @@ for chunk in stream:
 		},
 		typescript: {
 			label: "TypeScript / Fetch",
-			code: `const res = await fetch("${API_URL}/v1/chat/completions", {
+			code: `const res = await fetch("${apiUrl}/v1/chat/completions", {
   method: "POST",
   headers: {
     "x-api-key": "${apiKeySample}",
@@ -68,6 +70,25 @@ for chunk in stream:
 const data = await res.json();
 console.log(data.choices[0].message.content);`,
 		},
+		websocket: {
+			label: "WebSocket Telemetría (/api/ws)",
+			code: `const ws = new WebSocket("${wsUrl}/api/ws?apiKey=${apiKeySample}&pollMs=3000");
+
+ws.onopen = () => {
+  console.log("Conectado a telemetría en vivo de llama-engine");
+  // Cambiar intervalo en caliente o forzar refresh:
+  ws.send(JSON.stringify({ type: "set_interval", pollMs: 2000 }));
+};
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === "telemetry") {
+    console.log("GPU VRAM:", msg.status.gpu.vramUsedMiB, "MiB");
+  } else if (msg.type === "pulse") {
+    console.log("Velocidad en vivo:", msg.pulse.predictedPerSec, "tok/s");
+  }
+};`,
+		},
 		opencode: {
 			label: "opencode.json",
 			code: `{
@@ -77,7 +98,7 @@ console.log(data.choices[0].message.content);`,
       "npm": "@ai-sdk/openai-compatible",
       "name": "Llama Engine (local)",
       "options": {
-        "baseURL": "${API_URL}/v1",
+        "baseURL": "${apiUrl}/v1",
         "apiKey": "${apiKeySample}"
       },
       "models": {
@@ -94,7 +115,7 @@ console.log(data.choices[0].message.content);`,
 			code: `providers:
   llama-engine:
     type: openai
-    base_url: "${API_URL}/v1"
+    base_url: "${apiUrl}/v1"
     api_key: "${apiKeySample}"
 
 model_aliases:
@@ -133,8 +154,8 @@ model_aliases:
 			/>
 
 			<PageSection
-				title="Integración Rápida OpenAI-Compatible (/v1)"
-				subtitle={`Ejemplos preconfigurados con tu endpoint (${API_URL}) y modelo activo (${activeModel})`}
+				title="Integración Rápida OpenAI-Compatible (/v1) & Telemetría WebSocket (/api/ws)"
+				subtitle={`Ejemplos preconfigurados con tu endpoint (${apiUrl}) y modelo activo (${activeModel})`}
 				actions={
 					<Button variant="ghost" size="sm" onClick={copySnippet}>
 						<IconCopy size={14} />
@@ -166,15 +187,21 @@ model_aliases:
 						</span>
 					</div>
 					<div className="shortcut-item">
-						<span className="muted">Enviar mensaje en Playground</span>
+						<span className="muted">Enviar mensaje en Playground Studio</span>
 						<span>
 							<kbd className="kbd">Enter</kbd>
 						</span>
 					</div>
 					<div className="shortcut-item">
-						<span className="muted">Salto de línea en Playground</span>
+						<span className="muted">Salto de línea en Playground Studio</span>
 						<span>
 							<kbd className="kbd">Shift</kbd> + <kbd className="kbd">Enter</kbd>
+						</span>
+					</div>
+					<div className="shortcut-item">
+						<span className="muted">Pegar imagen en Playground Studio (Visión)</span>
+						<span>
+							<kbd className="kbd">Ctrl</kbd> + <kbd className="kbd">V</kbd>
 						</span>
 					</div>
 					<div className="shortcut-item">

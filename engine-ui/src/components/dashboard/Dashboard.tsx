@@ -38,8 +38,12 @@ export function Dashboard() {
 	if (loading) return <Loading />;
 	if (error && !status) return <ErrorState error={error} onRetry={refresh} />;
 
-	const tokPerSec = status?.slots.reduce((a, s) => a + (s.predictedPerSec || 0), 0) || 0;
-	const promptPerSec = status?.slots.reduce((a, s) => a + (s.promptPerSec || 0), 0) || 0;
+	const slotTokPerSec = status?.slots.reduce((a, s) => a + (s.predictedPerSec || 0), 0) || 0;
+	const slotPromptPerSec = status?.slots.reduce((a, s) => a + (s.promptPerSec || 0), 0) || 0;
+	const lastNonZeroTok = [...series].reverse().find((p) => p.tok > 0)?.tok ?? 0;
+	const lastNonZeroPrompt = [...series].reverse().find((p) => p.promptTok > 0)?.promptTok ?? 0;
+	const tokPerSec = slotTokPerSec > 0 ? slotTokPerSec : lastNonZeroTok;
+	const promptPerSec = slotPromptPerSec > 0 ? slotPromptPerSec : lastNonZeroPrompt;
 	const tone = statusTone(status ?? null, health ?? null);
 	const gpu = status?.gpu;
 	const registry = status?.models ?? [];
@@ -239,7 +243,10 @@ export function Dashboard() {
 				>
 					{gpu?.available ? (
 						<>
-							<Stat label="Acelerador" value={gpu.name || "NVIDIA GPU"} />
+							<Stat
+								label="Acelerador"
+								value={gpu.name?.replace(/^[^\x20-\x7E]+/, "").trim() || "NVIDIA GPU"}
+							/>
 							<Stat
 								label="Temperatura / Potencia"
 								value={`${gpu.temperatureC ?? "—"}°C · ${gpu.powerDrawW !== undefined ? `${gpu.powerDrawW.toFixed(1)} W` : "—"}`}

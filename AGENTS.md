@@ -21,7 +21,8 @@ se seleccionan mediante `LLAMA_MODEL` en `.env`; no hardcodees rutas de modelos 
 ## Flujo de ramas y despliegue en Docker (Obligatorio)
 
 - **Rama por feature desde `master`**: Siempre que se trabaje en una nueva feature o mejora, se debe crear y cambiar a una nueva rama partiendo desde `master` (por ejemplo, `git checkout master && git checkout -b feat/<nombre-descriptivo>`). Nunca desarrolles features directamente sobre `master`.
-- **Deploy y verificación en Docker**: Todo cambio o nueva feature debe desplegarse en Docker (`docker compose up -d --build` o reconstruyendo los servicios modificados) y verificarse en ejecución (`docker compose ps`, healthchecks y pruebas contra los endpoints/UI activos) para comprobar que la feature funciona correctamente de punta a punta antes de dar por finalizada la tarea.
+- **Deploy y verificación en Docker**: Todo cambio o nueva feature debe desplegarse en Docker y verificarse en ejecución (`docker compose ps`, healthchecks y pruebas contra los endpoints/UI activos) para comprobar que la feature funciona correctamente de punta a punta antes de dar por finalizada la tarea.
+  - **Importante (`--no-deps`)**: Como `engine-api` tiene `depends_on: [llama-runtime, llama-trainer]`, al reconstruir solo la API o la UI usá siempre **`docker compose up -d --build --no-deps engine-api engine-ui-telemetry`** para no disparar por arrastre un rebuild pesado de CUDA/PyTorch en `llama-runtime` o `llama-trainer`.
 
 ## Desarrollo y validación
 
@@ -64,7 +65,7 @@ Los builds de CUDA pueden tardar varios minutos y requieren Docker con soporte N
 - Mantené los cambios quirúrgicos y actualizá la documentación directamente relacionada.
 - No confirmes `.env`, credenciales, tokens, datasets privados ni archivos `.gguf`.
 - No modifiques archivos generados (`dist/`, builds de Vite o dependencias instaladas).
-- Mantener actualizado el CHANGELOG.md y `docs/` cuando se hagan cambios. 
+- **Documentación y sección Ayuda de `engine-ui` (Obligatorio)**: Siempre que se hagan cambios o se agreguen nuevas features/endpoints/pantallas, se deben mantener actualizados tanto `CHANGELOG.md` y `docs/` como la sección **Ayuda & Integración API** de `engine-ui` (`engine-ui/src/info.ts` y `engine-ui/src/components/help/HelpPage.tsx`: snippets listos para usar, atajos de teclado, manual de operación y changelog interno de la UI). 
 
 ## Docker y modelos
 

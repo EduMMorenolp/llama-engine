@@ -11,8 +11,10 @@ export const CHANGELOG: ChangelogEntry[] = [
 	{
 		version: "0.5.0",
 		date: "2026-11-17",
-		title: "Test & Benchmark Suite, Perfiles por Modelo, Playground Studio y Configuración",
+		title:
+			"Test & Benchmark Suite, Telemetría WebSocket Live, Perfiles por Modelo, Playground Studio y Configuración",
 		items: [
+			"Telemetría en tiempo real vía WebSocket (/api/ws): canal bidireccional persistente con pulsos de inferencia (tok/s) en vivo desde el proxy /v1, reconexión automática y 0% de uso en background cuando no hay pestañas conectadas.",
 			"Nueva sección Test & Benchmark (/test): evaluación objetiva del modelo cargado con baterías de Velocidad/TTFT, Razonamiento, Código TypeScript, JSON estricto, Stress Test de Contexto, Visión Multimodal y Prompt Personalizado N-runs, con Leaderboard comparativo y exportación a Markdown.",
 			"Sistema de Perfiles / Presets por modelo (models/presets.json): guardado de configuración óptima por GGUF y modos en 1 clic (Eco 8GB VRAM, Máxima Velocidad, Contexto 32K Coding, Multi-Agente).",
 			"Playground Studio mejorado: historial de sesiones persistente, renderizado Markdown con bloques de código copiables, acordeón de pensamiento (<think> / reasoning_content), personas de sistema, pegado de imágenes (Ctrl+V) y guardado directo en DataSets.",
@@ -98,27 +100,39 @@ export const MANUAL: ManualSection[] = [
 				],
 			},
 			{
-				heading: "Playground",
+				heading: "Playground Studio",
 				body: [
-					"Estudio interactivo de chat e inferencia multimodal conectado a /v1/chat/completions con streaming SSE. Permite adjuntar imágenes para modelos con visión (mmproj), ajustar temperatura/system prompt y exportar conversaciones como dataset JSONL.",
+					"Estudio interactivo de chat e inferencia multimodal conectado a /v1/chat/completions con streaming SSE. Incluye historial de sesiones persistente, renderizado Markdown con bloques de código copiables, acordeón de razonamiento (<think>), personas de sistema, pegado de imágenes (Ctrl+V) y botón para guardar conversaciones directo en DataSets.",
 				],
 			},
 			{
-				heading: "Modelos GGUF",
+				heading: "Test & Benchmark (/test)",
 				body: [
-					"Registry de modelos locales con filtros por capacidad (visión/texto), estimación de encaje en VRAM, presets de contexto (4K a 64K) y explorador integrado de Hugging Face Hub.",
+					"Suite de evaluación de rendimiento y calidad del modelo en VRAM: mide TTFT (ms), velocidad de generación (tok/s), razonamiento lógico, código TypeScript, JSON estricto, Stress Test de contexto largo y visión multimodal. Calcula una calificación global (S/A/B/C), guarda el Leaderboard comparativo entre modelos y exporta reportes en Markdown (.md).",
+				],
+			},
+			{
+				heading: "Modelos GGUF & Perfiles",
+				body: [
+					"Catálogo local con Perfiles de 1 clic (Eco VRAM 8GB, Máxima Velocidad, Contexto 32K Coding, Multi-Agente), guardado de presets permanentes por modelo (models/presets.json), eliminación de archivos GGUF y explorador de Hugging Face con semáforo de compatibilidad VRAM.",
 				],
 			},
 			{
 				heading: "Runtime & Logs",
 				body: [
-					"Configuración efectiva del motor (engine + runtimeEnv), controles seguros con confirmación (Reiniciar/Stop/Start) y consola de logs con filtro en vivo y descarga.",
+					"Configuración efectiva del motor, previsualización del comando CLI de llama-server, controles seguros con confirmación (Reiniciar/Stop/Start) y consola de logs con filtro en vivo y descarga.",
 				],
 			},
 			{
-				heading: "Telemetría",
+				heading: "Telemetría (WebSocket Live)",
 				body: [
-					"Gráficos de sesión (generación tok/s, prompt tok/s, utilización GPU y temperatura), tabla de slots concurrentes de llama-server y eficiencia energética (tok/s por Watt).",
+					"Gráficos en tiempo real impulsados por WebSocket (/api/ws) y pulsos en vivo desde el proxy /v1: generación tok/s, prompt tok/s, utilización GPU, temperatura, tabla de slots concurrentes, eficiencia energética (tok/s por Watt) y exportación a CSV.",
+				],
+			},
+			{
+				heading: "Configuración (/configuracion)",
+				body: [
+					"Personalización visual (Modo Oscuro Obsidian / Claro Paper, 4 colores de acento, densidad confortable/compacta, barra lateral colapsable), configuración de URL/API Key y respaldo/restauración completa del Workspace (.json).",
 				],
 			},
 			{

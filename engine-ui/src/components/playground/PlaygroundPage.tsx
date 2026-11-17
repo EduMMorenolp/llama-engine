@@ -110,7 +110,7 @@ function createEmptySession(model: string): ChatSession {
 
 export function PlaygroundPage() {
 	const [searchParams] = useSearchParams();
-	const { status, refresh } = useRuntime();
+	const { status, refresh, recordClientPulse } = useRuntime();
 	const modelActions = useModels(status?.models ?? [], refresh);
 	const toast = useToast();
 
@@ -150,7 +150,7 @@ export function PlaygroundPage() {
 	const [topK, setTopK] = useState(40);
 	const [minP, setMinP] = useState(0.05);
 	const [repeatPenalty, setRepeatPenalty] = useState(1.1);
-	const [maxTokens, setMaxTokens] = useState(1024);
+	const [maxTokens, setMaxTokens] = useState(2048);
 	const [jsonMode, setJsonMode] = useState(false);
 
 	const abortRef = useRef<AbortController | null>(null);
@@ -296,6 +296,9 @@ export function PlaygroundPage() {
 					const elapsedSec = Math.max(0.1, (performance.now() - startedAt) / 1000);
 					const tokPerSec = chunksCount / elapsedSec;
 					const ttftMs = Math.round(firstTokAt - startedAt);
+					if (chunksCount % 12 === 0) {
+						recordClientPulse(tokPerSec);
+					}
 					updateActiveSessionMessages((prev) =>
 						prev.map((item) =>
 							item.id === assistantId
@@ -311,6 +314,9 @@ export function PlaygroundPage() {
 								: item,
 						),
 					);
+				},
+				onComplete: (finalStats) => {
+					recordClientPulse(finalStats.tokPerSec);
 				},
 			});
 		} catch (err) {

@@ -60,7 +60,7 @@ export function Topbar({
 }) {
 	const location = useLocation();
 	const { theme, toggleTheme } = useTheme();
-	const { refresh, paused, setPaused, pollMs, setPollMs } = useRuntime();
+	const { refresh, paused, setPaused, pollMs, setPollMs, wsConnected } = useRuntime();
 	const tone = statusTone(status, health);
 
 	const segments = location.pathname.split("/").filter(Boolean);
@@ -70,6 +70,7 @@ export function Topbar({
 			: (ROUTE_LABELS[segments[segments.length - 1]] ?? segments[segments.length - 1]);
 
 	const activeCtx = health?.ctxSize ?? status?.ctxSize;
+	const cleanGpuName = status?.gpu.name?.replace(/^[^\x20-\x7E]+/, "").trim() || "NVIDIA GPU";
 	const liveTokPerSec = status?.slots.reduce((a, s) => a + (s.predictedPerSec || 0), 0) ?? 0;
 	const gpu = status?.gpu;
 
@@ -126,7 +127,7 @@ export function Topbar({
 				<Link
 					to="/telemetria"
 					className="topbar-gpu-chip"
-					title={`GPU: ${gpu.name || "NVIDIA"} · VRAM ${gpu.vramUsedMiB ?? 0}/${gpu.vramTotalMiB} MiB · ${gpu.temperatureC ?? "—"}°C`}
+					title={`GPU: ${cleanGpuName} · VRAM ${gpu.vramUsedMiB ?? 0}/${gpu.vramTotalMiB} MiB · ${gpu.temperatureC ?? "—"}°C`}
 				>
 					<span className="mono">
 						{((gpu.vramUsedMiB ?? 0) / 1024).toFixed(1)}/{(gpu.vramTotalMiB / 1024).toFixed(0)}G
@@ -230,9 +231,14 @@ export function Topbar({
 				</Link>
 			</div>
 
-			<div className={`status-pill status-pill-${tone}`} role="status">
+			<div
+				className={`status-pill status-pill-${tone}`}
+				role="status"
+				title={wsConnected ? "Conectado por WebSocket (/api/ws)" : "Modo HTTP Polling"}
+			>
 				<span className={`dot ${tone}`} aria-hidden="true" />
 				<span>{statusLabel(status, health)}</span>
+				{wsConnected ? <span className="topbar-ctx-tag">WS</span> : null}
 			</div>
 		</header>
 	);

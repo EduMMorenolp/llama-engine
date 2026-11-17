@@ -41,14 +41,14 @@ Consumer → engine-api POST /v1/chat/completions (OpenAI-compatible, auth API_K
   ← respuesta streaming
 ```
 
-### Telemetría
+### Telemetría (WebSocket `/api/ws` + REST `/api/status`)
 ```
-engine-ui → GET /api/status (con API_KEY)
-  → StatusService
-    ├─ GPU: runtime.exec("nvidia-smi ...") → VRAM, uso, temp, potencia
-    ├─ slots: GET runtime /slots → throughput tok/s (prompt + generación)
-    ├─ loadedModel: GET runtime /props → modelo cargado
-    └─ models: registry.list() → GGUFs montados en ./models
+engine-ui ↔ WS /api/ws?apiKey=... (push bidireccional + fallback GET /api/status)
+  → TelemetryWsHub + StatusService
+    ├─ GPU: runtime.exec("nvidia-smi ...") (con caché TTL 1.5s y solo si hay clientes WS activos)
+    ├─ slots + pulsos en vivo: GET runtime /slots + pulsos SSE en tiempo real desde proxy /v1
+    ├─ loadedModel + ctxSize: GET runtime /props
+    └─ models + presets: registry.list() → GGUFs montados en ./models + presets.json
 ```
 
 ### Gestión del runtime
@@ -67,8 +67,9 @@ POST /api/models/reload {modelId, ctxSize?, cacheTypeK?, cacheTypeV?, parallel?,
 | `runtime/manager.ts` | Dockerode: start/stop/reload/restart/exec del contenedor runtime y fusión de `LLAMA_*`. |
 | `models/registry.ts` | Scan de `MODELS_DIR` → registro de GGUFs (con detección de visión, `mmproj` huérfanos, presets persistentes en `presets.json` y eliminación de modelos). |
 | `hub/hf.ts` | Búsqueda en Hugging Face Hub y descarga GGUF (sincrónica o por job en background con progreso y escritura `.part`). |
-| `status/index.ts` | Telemetría agregada: GPU (con caché TTL) + slots + modelo + contexto + registro. |
-| `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con re-emisión del body y streaming SSE. |
+| `status/index.ts` | Telemetría agregada: GPU (con caché TTL) + slots + pulsos SSE en vivo + modelo + contexto + registro. |
+| `ws/telemetry.ts` | Servidor WebSocket RFC 6455 nativo en `/api/ws` para telemetría en tiempo real y pulsos de inferencia (`tok/s`). |
+| `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con re-emisión del body, streaming SSE y emisión de pulsos `tok/s` en vivo. |
 | `middleware/auth.ts` | Auth por API key (`x-api-key` o `Bearer`). |
 
 ## Proxy `/v1` — re-emisión del body

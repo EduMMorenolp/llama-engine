@@ -52,7 +52,9 @@ export function TelemetryPage() {
 
 	const gpu = status?.gpu;
 	const slots = status?.slots ?? [];
-	const current = series.length ? series[series.length - 1].tok : 0;
+	const latestPointTok = series.length ? series[series.length - 1].tok : 0;
+	const lastActiveTok = [...series].reverse().find((p) => p.tok > 0)?.tok ?? 0;
+	const current = latestPointTok > 0 ? latestPointTok : lastActiveTok;
 	const peakTok = series.reduce((max, p) => Math.max(max, p.tok), 0);
 	const efficiencyTokPerWatt =
 		gpu?.powerDrawW && gpu.powerDrawW > 0 && current > 0
@@ -143,7 +145,14 @@ export function TelemetryPage() {
 						value={health?.ctxSize ? `${health.ctxSize.toLocaleString()} tokens` : "—"}
 					/>
 					<Stat label="Modelos" value={status ? String(status.models.length) : "—"} />
-					<Stat label="GPU" value={gpu?.available ? gpu.name || "—" : "no disponible"} />
+					<Stat
+						label="GPU"
+						value={
+							gpu?.available
+								? gpu.name?.replace(/^[^\x20-\x7E]+/, "").trim() || "—"
+								: "no disponible"
+						}
+					/>
 					<Stat
 						label="VRAM"
 						value={gpu?.available ? `${gpu.vramUsedMiB} / ${gpu.vramTotalMiB} MiB` : "—"}
@@ -156,7 +165,7 @@ export function TelemetryPage() {
 				<Card title="GPU">
 					{gpu?.available ? (
 						<>
-							<Stat label="GPU" value={gpu.name || "—"} />
+							<Stat label="GPU" value={gpu.name?.replace(/^[^\x20-\x7E]+/, "").trim() || "—"} />
 							<Stat label="Uso" value={gpu.gpuUtilPct !== undefined ? `${gpu.gpuUtilPct}%` : "—"} />
 							<Stat
 								label="Temperatura"
