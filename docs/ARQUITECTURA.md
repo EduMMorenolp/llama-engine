@@ -65,9 +65,9 @@ POST /api/models/reload {modelId, ctxSize?, cacheTypeK?, cacheTypeV?, parallel?,
 | `env.ts` / `config.ts` | Validación de entorno con Zod + AppConfig tipado. |
 | `schemas.ts` | Esquemas Zod para validación de inputs en endpoints (`reload`, `deploy`, `hf/download`, `train/start`, `quantize`). |
 | `runtime/manager.ts` | Dockerode: start/stop/reload/restart/exec del contenedor runtime y fusión de `LLAMA_*`. |
-| `models/registry.ts` | Scan de `MODELS_DIR` → registro de GGUFs (con detección de visión). |
+| `models/registry.ts` | Scan de `MODELS_DIR` → registro de GGUFs (con detección de visión, `mmproj` huérfanos, presets persistentes en `presets.json` y eliminación de modelos). |
 | `hub/hf.ts` | Búsqueda en Hugging Face Hub y descarga GGUF (sincrónica o por job en background con progreso y escritura `.part`). |
-| `status/index.ts` | Telemetría agregada: GPU + slots + modelo + registro. |
+| `status/index.ts` | Telemetría agregada: GPU (con caché TTL) + slots + modelo + contexto + registro. |
 | `proxy/v1.ts` | Proxy transparente OpenAI `/v1` con re-emisión del body y streaming SSE. |
 | `middleware/auth.ts` | Auth por API key (`x-api-key` o `Bearer`). |
 

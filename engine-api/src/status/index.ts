@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config.js";
-import type { ModelRegistry, RegisteredModel } from "../models/registry.js";
+import type { ModelRegistry, OrphanMmproj, RegisteredModel } from "../models/registry.js";
 import type { RuntimeManager } from "../runtime/manager.js";
 
 export interface GpuInfo {
@@ -28,18 +28,23 @@ export interface EngineStatus {
 	runtimeRunning: boolean;
 	runtimeHealthy: boolean;
 	loadedModel?: string;
+	ctxSize?: number;
 	models: RegisteredModel[];
+	orphanMmprojs?: OrphanMmproj[];
 	gpu: GpuInfo;
 	slots: SlotInfo[];
 	timestamp: string;
 }
 
+const GPU_CACHE_TTL_MS = 1_500;
+
 /**
- * Telemetría del motor: GPU (vía nvidia-smi en el runtime), estado de llama-server
- * (health + slots con throughput tok/s) y registro de modelos.
+ * Telemetría del motor: GPU (vía nvidia-smi en el runtime con caché corto),
+ * estado de llama-server (health + slots con throughput tok/s + props) y registro de modelos.
  */
 export class StatusService {
 	private readonly startedAt = Date.now();
+	private gpuCache: { at: number; info: GpuInfo } | null = null;
 
 	constructor(
 		private readonly config: AppConfig,
@@ -48,14 +53,22 @@ export class StatusService {
 	) {}
 
 	async getGpu(): Promise<GpuInfo> {
+		const now = Date.now();
+		if (this.gpuCache && now - this.gpuCache.at < GPU_CACHE_TTL_MS) {
+			return this.gpuCache.info;
+		}
 		const out = await this.runtime.exec(
 			"nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu,power.draw --format=csv,noheader,nounits",
 		);
 		const line = out.trim();
-		if (!line) return { available: false };
+		if (!line) {
+			const fallback: GpuInfo = { available: false };
+			this.gpuCache = { at: now, info: fallback };
+			return fallback;
+		}
 		try {
 			const [name, total, used, free, util, temp, power] = line.split(",").map((s) => s.trim());
-			return {
+			const info: GpuInfo = {
 				available: true,
 				name,
 				vramTotalMiB: n(total),
@@ -65,6 +78,8 @@ export class StatusService {
 				temperatureC: n(temp),
 				powerDrawW: n(power),
 			};
+			this.gpuCache = { at: now, info };
+			return info;
 		} catch {
 			return { available: false };
 		}
@@ -99,24 +114,34 @@ export class StatusService {
 			.filter((s) => s.id >= 0);
 	}
 
-	async loadedModel(): Promise<string | undefined> {
+	private async getProps(): Promise<{ loadedModel?: string; ctxSize?: number }> {
 		try {
 			const res = await fetch(`${this.config.runtimeUrl}/props`, {
 				signal: AbortSignal.timeout(3000),
 			});
-			if (!res.ok) return undefined;
+			if (!res.ok) return {};
 			const json = (await res.json()) as {
 				model_alias?: string;
 				model_path?: string;
-				default_generation_settings?: { model?: string };
+				default_generation_settings?: { model?: string; n_ctx?: number };
 			};
 			const modelPath =
 				json.model_alias || json.model_path || json.default_generation_settings?.model;
-			if (!modelPath) return undefined;
-			return (modelPath.split(/[\\/]/).pop() || modelPath).replace(/\.gguf$/, "");
+			const loadedModel = modelPath
+				? (modelPath.split(/[\\/]/).pop() || modelPath).replace(/\.gguf$/, "")
+				: undefined;
+			return {
+				loadedModel,
+				ctxSize: json?.default_generation_settings?.n_ctx,
+			};
 		} catch {
-			return undefined;
+			return {};
 		}
+	}
+
+	async loadedModel(): Promise<string | undefined> {
+		const props = await this.getProps();
+		return props.loadedModel;
 	}
 
 	/** true si llama-server responde /health. */
@@ -126,32 +151,26 @@ export class StatusService {
 
 	/** n_ctx activo del runtime (default_generation_settings), si responde /props. */
 	async ctxSize(): Promise<number | undefined> {
-		try {
-			const res = await fetch(`${this.config.runtimeUrl}/props`, {
-				signal: AbortSignal.timeout(3000),
-			});
-			if (!res.ok) return undefined;
-			const json = (await res.json()) as { default_generation_settings?: { n_ctx?: number } };
-			return json?.default_generation_settings?.n_ctx;
-		} catch {
-			return undefined;
-		}
+		const props = await this.getProps();
+		return props.ctxSize;
 	}
 
 	async status(): Promise<EngineStatus> {
-		const [running, healthy, gpu, slots, loadedModel] = await Promise.all([
+		const [running, healthy, gpu, slots, props] = await Promise.all([
 			this.runtime.isRunning(),
 			this.fetchRuntime("/health").then((h) => h !== null),
 			this.getGpu(),
 			this.getSlots(),
-			this.loadedModel(),
+			this.getProps(),
 		]);
 		return {
 			apiUptimeMs: Date.now() - this.startedAt,
 			runtimeRunning: running,
 			runtimeHealthy: healthy,
-			loadedModel,
+			loadedModel: props.loadedModel,
+			ctxSize: props.ctxSize,
 			models: this.registry.list(),
+			orphanMmprojs: this.registry.listOrphanMmprojs(),
 			gpu,
 			slots,
 			timestamp: new Date().toISOString(),

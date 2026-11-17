@@ -18,6 +18,11 @@ consultá [`README.md`](./README.md), [`docs/ARQUITECTURA.md`](./docs/ARQUITECTU
 Conservá la separación entre la API y el runtime. Los modelos se montan desde `models/` y
 se seleccionan mediante `LLAMA_MODEL` en `.env`; no hardcodees rutas de modelos en el código.
 
+## Flujo de ramas y despliegue en Docker (Obligatorio)
+
+- **Rama por feature desde `master`**: Siempre que se trabaje en una nueva feature o mejora, se debe crear y cambiar a una nueva rama partiendo desde `master` (por ejemplo, `git checkout master && git checkout -b feat/<nombre-descriptivo>`). Nunca desarrolles features directamente sobre `master`.
+- **Deploy y verificación en Docker**: Todo cambio o nueva feature debe desplegarse en Docker (`docker compose up -d --build` o reconstruyendo los servicios modificados) y verificarse en ejecución (`docker compose ps`, healthchecks y pruebas contra los endpoints/UI activos) para comprobar que la feature funciona correctamente de punta a punta antes de dar por finalizada la tarea.
+
 ## Desarrollo y validación
 
 Ejecutá los comandos desde la carpeta del paquete correspondiente:

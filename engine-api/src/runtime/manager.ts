@@ -19,11 +19,24 @@ export function mergeContainerEnv(
 	if (opts.cacheTypeV !== undefined) updates.set("LLAMA_CACHE_TYPE_V", opts.cacheTypeV);
 	if (opts.parallel !== undefined) updates.set("LLAMA_PARALLEL", String(opts.parallel));
 	if (opts.threads !== undefined) updates.set("LLAMA_THREADS", String(opts.threads));
+	if (opts.threadsBatch !== undefined)
+		updates.set("LLAMA_THREADS_BATCH", String(opts.threadsBatch));
 	if (opts.flashAttn !== undefined) updates.set("LLAMA_FLASH_ATTN", opts.flashAttn);
 	if (opts.chatTemplate !== undefined) updates.set("LLAMA_CHAT_TEMPLATE", opts.chatTemplate);
-	if (opts.gpuLayers !== undefined) updates.set("LLAMA_GPU_LAYERS", String(opts.gpuLayers));
+	if (opts.gpuLayers !== undefined) {
+		updates.set("LLAMA_GPU_LAYERS", String(opts.gpuLayers));
+		updates.set("LLAMA_NGPU", String(opts.gpuLayers));
+	}
 	if (opts.batchSize !== undefined) updates.set("LLAMA_BATCH", String(opts.batchSize));
 	if (opts.ubatchSize !== undefined) updates.set("LLAMA_UBATCH", String(opts.ubatchSize));
+	if (opts.ropeFreqBase !== undefined)
+		updates.set("LLAMA_ROPE_FREQ_BASE", String(opts.ropeFreqBase));
+	if (opts.ropeFreqScale !== undefined)
+		updates.set("LLAMA_ROPE_FREQ_SCALE", String(opts.ropeFreqScale));
+	if (opts.jinja !== undefined) updates.set("LLAMA_JINJA", opts.jinja ? "1" : "0");
+	if (opts.reasoningFormat !== undefined)
+		updates.set("LLAMA_REASONING_FORMAT", opts.reasoningFormat);
+	if (opts.loraAdapter !== undefined) updates.set("LLAMA_LORA", opts.loraAdapter);
 
 	const seen = new Set<string>();
 	const nextEnv = currentEnv.map((kv) => {

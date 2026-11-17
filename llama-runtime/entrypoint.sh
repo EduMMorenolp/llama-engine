@@ -20,15 +20,29 @@ if [[ ! -f "$MODEL_FILE" ]]; then
   exit 1
 fi
 
+GPU_LAYERS="${LLAMA_GPU_LAYERS:-${LLAMA_NGPU:--1}}"
+
 ARGS=(--model "$MODEL_FILE")
 ARGS+=(--host 0.0.0.0)
 ARGS+=(--port 8080)
 ARGS+=(--ctx-size "${LLAMA_CTX_SIZE:-32768}")
-ARGS+=(--n-gpu-layers "${LLAMA_NGPU:--1}")
+ARGS+=(--n-gpu-layers "$GPU_LAYERS")
 
-if [[ "${LLAMA_FLASH_ATTN:-1}" == "1" ]]; then
-  ARGS+=(--flash-attn on)
-fi
+FLASH_VAL="${LLAMA_FLASH_ATTN:-on}"
+case "${FLASH_VAL,,}" in
+  1|on|true|yes)
+    ARGS+=(--flash-attn on)
+    ;;
+  auto)
+    ARGS+=(--flash-attn auto)
+    ;;
+  0|off|false|no)
+    ARGS+=(--flash-attn off)
+    ;;
+  *)
+    ARGS+=(--flash-attn on)
+    ;;
+esac
 
 CHAT_TEMPLATE="${LLAMA_CHAT_TEMPLATE:-auto}"
 if [[ "$CHAT_TEMPLATE" != "auto" && -n "$CHAT_TEMPLATE" ]]; then
@@ -56,10 +70,39 @@ if [[ -n "${LLAMA_THREADS_BATCH:-}" ]]; then
   ARGS+=(--threads-batch "$LLAMA_THREADS_BATCH")
 fi
 
+# --- Optimizacion: batch / ubatch ---
+if [[ -n "${LLAMA_BATCH:-}" ]]; then
+  ARGS+=(--batch-size "$LLAMA_BATCH")
+fi
+if [[ -n "${LLAMA_UBATCH:-}" ]]; then
+  ARGS+=(--ubatch-size "$LLAMA_UBATCH")
+fi
+
+# --- Context extension / RoPE ---
+if [[ -n "${LLAMA_ROPE_FREQ_BASE:-}" ]]; then
+  ARGS+=(--rope-freq-base "$LLAMA_ROPE_FREQ_BASE")
+fi
+if [[ -n "${LLAMA_ROPE_FREQ_SCALE:-}" ]]; then
+  ARGS+=(--rope-freq-scale "$LLAMA_ROPE_FREQ_SCALE")
+fi
+
+# --- Jinja / Tool calling & Reasoning format ---
+if [[ "${LLAMA_JINJA:-}" == "1" || "${LLAMA_JINJA:-}" == "true" || "${LLAMA_JINJA:-}" == "on" ]]; then
+  ARGS+=(--jinja)
+fi
+if [[ -n "${LLAMA_REASONING_FORMAT:-}" && "${LLAMA_REASONING_FORMAT}" != "auto" ]]; then
+  ARGS+=(--reasoning-format "$LLAMA_REASONING_FORMAT")
+fi
+
+# --- Adaptador LoRA en caliente ---
+if [[ -n "${LLAMA_LORA:-}" && -f "/models/${LLAMA_LORA}.gguf" ]]; then
+  ARGS+=(--lora "/models/${LLAMA_LORA}.gguf")
+fi
+
 # Vision: si existe mmproj del modelo, activar multimodal
 if [[ "${LLAMA_MMPROJ:-auto}" == "auto" && -f "$MMPROJ_FILE" ]]; then
   ARGS+=(--mmproj "$MMPROJ_FILE")
-elif [[ "${LLAMA_MMPROJ}" != "auto" && -f "/models/${LLAMA_MMPROJ}.gguf" ]]; then
+elif [[ "${LLAMA_MMPROJ:-auto}" != "auto" && "${LLAMA_MMPROJ:-}" != "off" && -f "/models/${LLAMA_MMPROJ}.gguf" ]]; then
   ARGS+=(--mmproj "/models/${LLAMA_MMPROJ}.gguf")
 fi
 

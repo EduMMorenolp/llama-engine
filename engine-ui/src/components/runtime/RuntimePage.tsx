@@ -23,6 +23,14 @@ const ENV_DESCRIPTIONS: Record<string, string> = {
 	LLAMA_PARALLEL: "Cantidad de slots paralelos en llama-server",
 	LLAMA_THREADS: "Hilos de CPU durante generación de tokens",
 	LLAMA_THREADS_BATCH: "Hilos de CPU durante prefill/batching",
+	LLAMA_GPU_LAYERS: "Capas en GPU (-1 o 999 = todas las capas)",
+	LLAMA_BATCH: "Tamaño de batch lógico de prefill (--batch-size)",
+	LLAMA_UBATCH: "Tamaño de batch físico por pasada (--ubatch-size)",
+	LLAMA_JINJA: "Habilita el motor Jinja para Tool Calling (--jinja)",
+	LLAMA_ROPE_FREQ_BASE: "Frecuencia base RoPE para extensión de contexto",
+	LLAMA_ROPE_FREQ_SCALE: "Factor de escala RoPE",
+	LLAMA_REASONING_FORMAT: "Formato de extracción de pensamiento (deepseek/none)",
+	LLAMA_LORA: "Adaptador LoRA GGUF montado en caliente (--lora)",
 };
 
 export function RuntimePage() {
@@ -83,6 +91,20 @@ export function RuntimePage() {
 
 	const engine = config?.engine;
 	const envEntries = config?.runtimeEnv ? Object.entries(config.runtimeEnv) : [];
+	const rEnv = config?.runtimeEnv ?? {};
+	const reconstructedCmd = [
+		"llama-server",
+		`--model /models/${rEnv.LLAMA_MODEL || status?.loadedModel || "qwen3.5-4b"}.gguf`,
+		`--ctx-size ${rEnv.LLAMA_CTX_SIZE || "32768"}`,
+		`--n-gpu-layers ${rEnv.LLAMA_GPU_LAYERS || rEnv.LLAMA_NGPU || "-1"}`,
+		`--flash-attn ${rEnv.LLAMA_FLASH_ATTN === "0" || rEnv.LLAMA_FLASH_ATTN === "off" ? "off" : "on"}`,
+		...(rEnv.LLAMA_CACHE_TYPE_K ? [`--cache-type-k ${rEnv.LLAMA_CACHE_TYPE_K}`] : []),
+		...(rEnv.LLAMA_CACHE_TYPE_V ? [`--cache-type-v ${rEnv.LLAMA_CACHE_TYPE_V}`] : []),
+		...(rEnv.LLAMA_PARALLEL ? [`--parallel ${rEnv.LLAMA_PARALLEL}`] : []),
+		...(rEnv.LLAMA_THREADS ? [`--threads ${rEnv.LLAMA_THREADS}`] : []),
+		...(rEnv.LLAMA_BATCH ? [`--batch-size ${rEnv.LLAMA_BATCH}`] : []),
+		...(rEnv.LLAMA_JINJA === "1" ? ["--jinja"] : []),
+	].join(" ");
 
 	const formatEngineValue = (val: unknown): string => {
 		if (val && typeof val === "object") {
@@ -117,10 +139,28 @@ export function RuntimePage() {
 	return (
 		<div className="page-stack">
 			<PageHeader
-				title="Runtime"
-				description="Configuración efectiva del motor, variables LLAMA_* y consola de logs de llama-server"
+				title="Runtime & Diagnóstico"
+				description="Configuración efectiva del motor, comando llama-server activo, variables LLAMA_* y consola de logs"
 				badge={status?.runtimeRunning ? "Contenedor Activo" : "Detenido"}
 			/>
+
+			<div className="selected-model-banner">
+				<IconTerminal size={16} className="accent-text" />
+				<span className="mono small" style={{ flex: 1 }}>
+					{reconstructedCmd}
+				</span>
+				<Button
+					size="sm"
+					variant="ghost"
+					onClick={async () => {
+						await navigator.clipboard.writeText(reconstructedCmd);
+						toast.success("Comando llama-server copiado");
+					}}
+				>
+					<IconCopy size={13} />
+					<span>Copiar flag CLI</span>
+				</Button>
+			</div>
 
 			<div className="grid grid-2">
 				<PageSection title="Engine" subtitle="Parámetros del wrapper engine-api">

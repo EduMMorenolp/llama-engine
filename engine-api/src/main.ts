@@ -15,6 +15,7 @@ import {
 	deployBodySchema,
 	formatZodError,
 	hfDownloadBodySchema,
+	modelPresetSchema,
 	quantizeBodySchema,
 	reloadBodySchema,
 	trainStartBodySchema,
@@ -101,7 +102,55 @@ async function bootstrap() {
 	});
 
 	app.get("/api/models", (_req, res) => {
-		res.json({ models: registry.list() });
+		res.json({
+			models: registry.list(),
+			orphanMmprojs: registry.listOrphanMmprojs(),
+			presets: registry.readPresets(),
+		});
+	});
+
+	app.get("/api/models/presets", (_req, res) => {
+		res.json({ presets: registry.readPresets() });
+	});
+
+	app.put("/api/models/:id/preset", (req, res) => {
+		const id = req.params.id;
+		if (!registry.get(id)) {
+			res.status(404).json({ error: { message: `Modelo "${id}" no registrado` } });
+			return;
+		}
+		const parsed = modelPresetSchema.safeParse(req.body ?? {});
+		if (!parsed.success) {
+			res.status(400).json({ error: { message: formatZodError(parsed.error) } });
+			return;
+		}
+		const saved = registry.savePreset(id, parsed.data);
+		res.json({ ok: true, modelId: id, preset: saved });
+	});
+
+	app.delete("/api/models/:id", async (req, res) => {
+		const id = req.params.id;
+		const loaded = await status.loadedModel();
+		if (loaded && loaded === id) {
+			res.status(409).json({
+				error: {
+					message: `El modelo "${id}" está cargado en VRAM. Cargá otro modelo o detené el runtime antes de eliminarlo.`,
+				},
+			});
+			return;
+		}
+		try {
+			const includeMmproj = req.query.includeMmproj === "true";
+			const { deletedFiles } = registry.deleteModel(id, includeMmproj);
+			res.json({
+				ok: true,
+				deletedFiles,
+				message: `Modelo "${id}" eliminado (${deletedFiles.join(", ")})`,
+			});
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			res.status(404).json({ error: { message: msg } });
+		}
 	});
 
 	app.post("/api/models/reload", async (req, res) => {
@@ -111,11 +160,14 @@ async function bootstrap() {
 			return;
 		}
 		const { modelId, ...opts } = parsed.data;
-		if (!registry.get(modelId)) {
+		const model = registry.get(modelId);
+		if (!model) {
 			res.status(404).json({ error: { message: `Modelo "${modelId}" no registrado` } });
 			return;
 		}
-		const result = await runtime.reload(modelId, opts);
+		// Fusionar el preset guardado del modelo con los overrides enviados en el request
+		const mergedOpts = { ...(model.preset ?? {}), ...opts };
+		const result = await runtime.reload(modelId, mergedOpts);
 		res.status(result.ok ? 200 : 500).json(result);
 	});
 
@@ -230,6 +282,28 @@ async function bootstrap() {
 			const response = await fetch(`${config.trainerUrl}/api/datasets/${id}`, {
 				method: "DELETE",
 			});
+			const data = await response.json();
+			res.status(response.status).json(data);
+		} catch {
+			res.status(502).json({ error: { message: "Trainer service unavailable" } });
+		}
+	});
+
+	app.post("/api/datasets/:id/append", async (req, res) => {
+		const id = req.params.id;
+		if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+			res.status(400).json({ error: { message: "datasetId inválido" } });
+			return;
+		}
+		try {
+			const response = await fetch(
+				`${config.trainerUrl}/api/datasets/${encodeURIComponent(id)}/append`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(req.body ?? {}),
+				},
+			);
 			const data = await response.json();
 			res.status(response.status).json(data);
 		} catch {

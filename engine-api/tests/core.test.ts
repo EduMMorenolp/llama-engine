@@ -107,10 +107,33 @@ describe("ModelRegistry", () => {
 		expect(gemma?.vision).toBe(false);
 	});
 
-	it("no registra los mmproj como modelos", () => {
+	it("no registra los mmproj como modelos pero los reporta como huérfanos", () => {
 		const dir = tempDir();
 		writeFileSync(join(dir, "mmproj-foo.gguf"), "x");
 		const reg = new ModelRegistry(makeConfig({ MODELS_DIR: dir }));
+		expect(reg.list()).toHaveLength(0);
+		const orphans = reg.listOrphanMmprojs();
+		expect(orphans).toHaveLength(1);
+		expect(orphans[0].expectedModelId).toBe("foo");
+	});
+
+	it("guarda y asocia presets por modelo y permite eliminar un modelo", () => {
+		const dir = tempDir();
+		writeFileSync(join(dir, "phi-4-mini.gguf"), "abc");
+		const reg = new ModelRegistry(makeConfig({ MODELS_DIR: dir }));
+		reg.savePreset("phi-4-mini", {
+			label: "Eco 8GB",
+			ctxSize: 16384,
+			cacheTypeK: "q8_0",
+			cacheTypeV: "q4_0",
+			parallel: 1,
+		});
+		const model = reg.get("phi-4-mini");
+		expect(model?.preset?.ctxSize).toBe(16384);
+		expect(model?.preset?.label).toBe("Eco 8GB");
+
+		const del = reg.deleteModel("phi-4-mini");
+		expect(del.deletedFiles).toContain("phi-4-mini.gguf");
 		expect(reg.list()).toHaveLength(0);
 	});
 

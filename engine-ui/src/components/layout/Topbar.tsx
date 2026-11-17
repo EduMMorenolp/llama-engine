@@ -3,13 +3,16 @@ import type { EngineStatus, RuntimeHealth } from "../../api";
 import { useTheme } from "../../context/ThemeContext";
 import { useRuntime } from "../../hooks/useRuntime";
 import {
+	IconBolt,
 	IconCpu,
+	IconGauge,
 	IconMenu,
 	IconMoon,
 	IconPause,
 	IconPlay,
 	IconRefresh,
 	IconSearch,
+	IconSettings,
 	IconSun,
 } from "../ui/Icons";
 
@@ -31,12 +34,14 @@ export function statusLabel(status: EngineStatus | null, health: RuntimeHealth |
 
 const ROUTE_LABELS: Record<string, string> = {
 	"": "Dashboard",
-	playground: "Playground",
+	playground: "Playground Studio",
+	test: "Test & Benchmark",
 	modelos: "Modelos GGUF",
 	crear: "Asistente de Modelos",
 	datasets: "DataSets",
 	runtime: "Runtime & Logs",
 	telemetria: "Telemetría",
+	configuracion: "Configuración",
 	ayuda: "Ayuda & API",
 };
 
@@ -63,6 +68,10 @@ export function Topbar({
 		segments.length === 0
 			? "Dashboard"
 			: (ROUTE_LABELS[segments[segments.length - 1]] ?? segments[segments.length - 1]);
+
+	const activeCtx = health?.ctxSize ?? status?.ctxSize;
+	const liveTokPerSec = status?.slots.reduce((a, s) => a + (s.predictedPerSec || 0), 0) ?? 0;
+	const gpu = status?.gpu;
 
 	return (
 		<header className="topbar">
@@ -113,21 +122,53 @@ export function Topbar({
 				</button>
 			) : null}
 
+			{gpu?.available && gpu.vramTotalMiB ? (
+				<Link
+					to="/telemetria"
+					className="topbar-gpu-chip"
+					title={`GPU: ${gpu.name || "NVIDIA"} · VRAM ${gpu.vramUsedMiB ?? 0}/${gpu.vramTotalMiB} MiB · ${gpu.temperatureC ?? "—"}°C`}
+				>
+					<span className="mono">
+						{((gpu.vramUsedMiB ?? 0) / 1024).toFixed(1)}/{(gpu.vramTotalMiB / 1024).toFixed(0)}G
+					</span>
+					{gpu.temperatureC !== undefined ? (
+						<span
+							className={`topbar-temp ${gpu.temperatureC >= 78 ? "hot" : ""}`}
+						>{`${gpu.temperatureC}°C`}</span>
+					) : null}
+					{liveTokPerSec > 0 ? (
+						<span className="topbar-tok">
+							<IconBolt size={11} />
+							{liveTokPerSec.toFixed(1)}
+						</span>
+					) : null}
+				</Link>
+			) : null}
+
 			{status?.loadedModel ? (
 				<Link
 					to="/modelos"
 					className="topbar-model-pill"
-					title={`Modelo cargado: ${status.loadedModel}${health?.ctxSize ? ` · ctx ${health.ctxSize}` : ""}`}
+					title={`Modelo cargado: ${status.loadedModel}${activeCtx ? ` · ctx ${activeCtx}` : ""}`}
 				>
 					<IconCpu size={14} />
 					<span className="mono">{status.loadedModel}</span>
-					{health?.ctxSize ? (
-						<span className="topbar-ctx-tag">{Math.round(health.ctxSize / 1024)}K</span>
+					{activeCtx ? (
+						<span className="topbar-ctx-tag">{Math.round(activeCtx / 1024)}K</span>
 					) : null}
 				</Link>
 			) : null}
 
 			<div className="topbar-controls">
+				<Link
+					to="/test"
+					className="icon-btn"
+					title="Ir a Test & Benchmark del modelo"
+					aria-label="Test & Benchmark"
+				>
+					<IconGauge size={15} />
+				</Link>
+
 				<select
 					className="topbar-poll-select"
 					aria-label="Intervalo de actualización"
@@ -142,6 +183,7 @@ export function Topbar({
 						}
 					}}
 				>
+					<option value="2000">Poll 2s</option>
 					<option value="3000">Poll 3s</option>
 					<option value="5000">Poll 5s</option>
 					<option value="10000">Poll 10s</option>
@@ -177,6 +219,15 @@ export function Topbar({
 				>
 					{theme === "dark" ? <IconSun size={15} /> : <IconMoon size={15} />}
 				</button>
+
+				<Link
+					to="/configuracion"
+					className="icon-btn"
+					title="Configuración y personalización"
+					aria-label="Configuración"
+				>
+					<IconSettings size={15} />
+				</Link>
 			</div>
 
 			<div className={`status-pill status-pill-${tone}`} role="status">

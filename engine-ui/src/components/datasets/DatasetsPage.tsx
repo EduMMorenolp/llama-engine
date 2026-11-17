@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+	appendDatasetExample,
 	type Dataset,
 	type DatasetPreview,
 	deleteDataset,
@@ -13,7 +14,7 @@ import { useToast } from "../../context/ToastContext";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { fmtBytes, fmtCount } from "../ui/helpers";
-import { IconCheck, IconDatabase, IconEye, IconSparkles, IconTrash } from "../ui/Icons";
+import { IconCheck, IconDatabase, IconEye, IconPlus, IconSparkles, IconTrash } from "../ui/Icons";
 import { PageHeader, PageSection } from "../ui/PageHeader";
 import { EmptyState, ErrorState, Loading } from "../ui/states";
 import { DatasetDropzone } from "./DatasetDropzone";
@@ -33,6 +34,14 @@ export function DatasetsPage() {
 	const [previews, setPreviews] = useState<Record<string, DatasetPreview>>({});
 	const [busyRow, setBusyRow] = useState<string | null>(null);
 	const [confirmId, setConfirmId] = useState<string | null>(null);
+
+	// Creador interactivo de ejemplos
+	const [builderOpen, setBuilderOpen] = useState(false);
+	const [targetName, setTargetName] = useState("custom-dataset");
+	const [sysText, setSysText] = useState("Sos un asistente experto y conciso.");
+	const [userText, setUserText] = useState("");
+	const [assistantText, setAssistantText] = useState("");
+	const [savingExample, setSavingExample] = useState(false);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -145,6 +154,29 @@ export function DatasetsPage() {
 		navigate(`/modelos/crear?flow=${flow}&datasetId=${encodeURIComponent(id)}`);
 	};
 
+	const handleAppendExample = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!userText.trim() || !assistantText.trim()) return;
+		setSavingExample(true);
+		try {
+			const messages = [
+				...(sysText.trim() ? [{ role: "system", content: sysText.trim() }] : []),
+				{ role: "user", content: userText.trim() },
+				{ role: "assistant", content: assistantText.trim() },
+			];
+			const ds = await appendDatasetExample(targetName.trim() || "custom-dataset", messages);
+			toast.success("Ejemplo agregado", `"${ds.name}" ahora tiene ${ds.examples} ejemplo(s).`);
+			setUserText("");
+			setAssistantText("");
+			void load();
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			toast.error("No se pudo guardar el ejemplo", msg);
+		} finally {
+			setSavingExample(false);
+		}
+	};
+
 	if (loading) return <Loading />;
 	if (error) return <ErrorState error={error} onRetry={load} />;
 
@@ -172,10 +204,78 @@ export function DatasetsPage() {
 			</div>
 
 			<PageSection
-				title="Subir dataset"
-				subtitle="Arrastrá archivos .jsonl o .json para incorporarlos a llama-trainer"
+				title="Subir o Construir Dataset"
+				subtitle="Arrastrá archivos .jsonl / .json o redactá nuevos pares de instrucción/respuesta desde la interfaz"
+				actions={
+					<Button variant="ghost" size="sm" onClick={() => setBuilderOpen((v) => !v)}>
+						<IconPlus size={14} />
+						<span>{builderOpen ? "Ocultar Creador" : "Crear Ejemplo Manual"}</span>
+					</Button>
+				}
 			>
 				<DatasetDropzone onUploaded={handleUploaded} />
+				{builderOpen ? (
+					<form
+						className="settings-stack"
+						style={{ marginTop: "1rem" }}
+						onSubmit={handleAppendExample}
+					>
+						<div className="config-grid">
+							<div className="field">
+								<label htmlFor="ds-target-id">Nombre del Dataset (.jsonl)</label>
+								<input
+									id="ds-target-id"
+									type="text"
+									value={targetName}
+									onChange={(e) => setTargetName(e.target.value)}
+									placeholder="custom-dataset"
+								/>
+							</div>
+							<div className="field">
+								<label htmlFor="ds-sys-input">System Prompt (opcional)</label>
+								<input
+									id="ds-sys-input"
+									type="text"
+									value={sysText}
+									onChange={(e) => setSysText(e.target.value)}
+								/>
+							</div>
+						</div>
+						<div className="grid grid-2">
+							<div className="field">
+								<label htmlFor="ds-user-input">Mensaje Usuario (Instruction / Prompt)</label>
+								<textarea
+									id="ds-user-input"
+									rows={3}
+									value={userText}
+									onChange={(e) => setUserText(e.target.value)}
+									placeholder="Escribí la pregunta o instrucción de entrada…"
+								/>
+							</div>
+							<div className="field">
+								<label htmlFor="ds-asst-input">Respuesta Esperada del Asistente</label>
+								<textarea
+									id="ds-asst-input"
+									rows={3}
+									value={assistantText}
+									onChange={(e) => setAssistantText(e.target.value)}
+									placeholder="Escribí la respuesta ideal para entrenar al modelo…"
+								/>
+							</div>
+						</div>
+						<div className="action-row">
+							<Button
+								type="submit"
+								variant="primary"
+								busy={savingExample}
+								disabled={!userText.trim() || !assistantText.trim()}
+							>
+								<IconPlus size={14} />
+								<span>Guardar ejemplo en {targetName || "custom-dataset"}.jsonl</span>
+							</Button>
+						</div>
+					</form>
+				) : null}
 				{notice ? (
 					<p className="feedback feedback-ok" role="status">
 						{notice}

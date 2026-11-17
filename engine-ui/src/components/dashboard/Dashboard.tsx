@@ -20,6 +20,7 @@ import {
 	IconBolt,
 	IconCpu,
 	IconEye,
+	IconGauge,
 	IconModels,
 	IconPlayground,
 	IconSparkles,
@@ -70,7 +71,11 @@ export function Dashboard() {
 					<div className="action-row">
 						<Button variant="primary" onClick={() => navigate("/playground")}>
 							<IconPlayground size={15} />
-							<span>Probar en Playground</span>
+							<span>Playground Studio</span>
+						</Button>
+						<Button variant="default" onClick={() => navigate("/test")}>
+							<IconGauge size={15} />
+							<span>Test & Benchmark</span>
 						</Button>
 						<Button variant="ghost" onClick={() => navigate("/modelos/crear")}>
 							<IconSparkles size={15} />
@@ -291,14 +296,20 @@ export function Dashboard() {
 									</div>
 									<div className="quick-model-actions">
 										{isLoaded ? (
-											<Button
-												size="sm"
-												variant="primary"
-												onClick={() => navigate(`/playground?model=${encodeURIComponent(m.id)}`)}
-											>
-												<IconPlayground size={14} />
-												<span>Chatear</span>
-											</Button>
+											<div className="action-row">
+												<Button
+													size="sm"
+													variant="primary"
+													onClick={() => navigate(`/playground?model=${encodeURIComponent(m.id)}`)}
+												>
+													<IconPlayground size={14} />
+													<span>Chatear</span>
+												</Button>
+												<Button size="sm" variant="ghost" onClick={() => navigate("/test")}>
+													<IconGauge size={14} />
+													<span>Testear</span>
+												</Button>
+											</div>
 										) : (
 											<Button
 												size="sm"

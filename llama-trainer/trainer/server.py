@@ -118,6 +118,37 @@ def delete_dataset(dataset_id: str):
     return jsonify({"error": "Dataset not found"}), 404
 
 
+@app.route("/api/datasets/<dataset_id>/append", methods=["POST"])
+def append_dataset_example(dataset_id: str):
+    try:
+        safe_id = sanitize_identifier(dataset_id)
+    except ValueError:
+        return jsonify({"error": "Invalid dataset id"}), 400
+
+    data = request.get_json(force=True)
+    messages = data.get("messages")
+    if not isinstance(messages, list) or len(messages) == 0:
+        return jsonify({"error": "messages list required"}), 400
+
+    ds_dir = Path(DATA_DIR) / "datasets"
+    ds_dir.mkdir(parents=True, exist_ok=True)
+    target = safe_join(ds_dir, f"{safe_id}.jsonl")
+
+    line = json.dumps({"messages": messages}, ensure_ascii=False)
+    with target.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+    count = sum(1 for _ in target.open(encoding="utf-8"))
+    return jsonify({
+        "ok": True,
+        "id": safe_id,
+        "name": target.name,
+        "examples": count,
+        "format": detect_format(target),
+        "sizeBytes": target.stat().st_size,
+    })
+
+
 @app.route("/api/datasets/<dataset_id>/validate", methods=["GET"])
 def validate_dataset(dataset_id: str):
     try:
@@ -270,6 +301,7 @@ def start_training():
         "epoch": 0,
         "totalEpochs": data.get("epochs", 3),
         "loss": 0,
+        "lossHistory": [],
         "config": data,
         "logs": [],
     }
@@ -380,15 +412,23 @@ def run_training(job_id: str):
         dataset = load_dataset("json", data_files=dataset_path, split="train")
 
         # 5. Format dataset for SFT
+        sys_prompt = str(config.get("systemPrompt", "") or "").strip()
+
         def format_chat(example):
             if "messages" in example:
-                text = tokenizer.apply_chat_template(example["messages"], tokenize=False)
+                msgs = list(example["messages"])
+                if sys_prompt and not any(m.get("role") == "system" for m in msgs):
+                    msgs.insert(0, {"role": "system", "content": sys_prompt})
+                text = tokenizer.apply_chat_template(msgs, tokenize=False)
             elif "conversations" in example:
                 messages = [{"role": c["from"], "content": c["value"]}
                            for c in example["conversations"]]
+                if sys_prompt and not any(m.get("role") == "system" for m in messages):
+                    messages.insert(0, {"role": "system", "content": sys_prompt})
                 text = tokenizer.apply_chat_template(messages, tokenize=False)
             elif "instruction" in example:
-                text = f"User: {example['instruction']}\nAssistant: {example.get('output', '')}"
+                prefix = f"System: {sys_prompt}\n" if sys_prompt else ""
+                text = f"{prefix}User: {example['instruction']}\nAssistant: {example.get('output', '')}"
             else:
                 text = str(example)
             return {"text": text}
@@ -422,9 +462,15 @@ def run_training(job_id: str):
         class ProgressCallback(TrainerCallback):
             def on_log(self, args, state, control, logs=None, **kwargs):
                 if logs and "loss" in logs:
-                    job["loss"] = logs["loss"]
+                    loss_val = float(logs["loss"])
+                    job["loss"] = loss_val
                     job["epoch"] = state.epoch or 0
                     job["progress"] = int((state.epoch / epochs) * 100) if state.epoch else 0
+                    job["lossHistory"].append({
+                        "step": int(state.global_step or len(job["lossHistory"]) + 1),
+                        "epoch": round(float(state.epoch or 0), 2),
+                        "loss": round(loss_val, 4),
+                    })
                 if job["status"] == "stopped":
                     control.should_training_stop = True
 
@@ -434,6 +480,16 @@ def run_training(job_id: str):
         if job["status"] == "stopped":
             job["logs"].append("Entrenamiento detenido por el usuario")
         else:
+            # Guardar adaptador o modelo fusionado en disco para posterior conversión GGUF
+            if method in ("qlora", "lora") and hasattr(model, "merge_and_unload"):
+                job["logs"].append("Merging LoRA adapter weights into base model for GGUF export...")
+                merged_model = model.merge_and_unload()
+                merged_model.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
+            else:
+                model.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
+
             job["status"] = "completed"
             job["progress"] = 100
             job["epoch"] = epochs
@@ -526,22 +582,30 @@ def run_quantize(job_id: str, model_id: str, method: str, use_imatrix: bool):
         output_base = Path(DATA_DIR) / "output"
 
         input_path = safe_join(models_dir, f"{safe_model_id}.gguf")
+        is_hf_dir = False
         if not input_path.exists():
-            # Check if it's an HF model in output
-            input_path = safe_join(output_base, f"{safe_model_id}/adapter_model.safetensors")
-            if not input_path.exists():
+            # Check if it's a trained HF model directory in output
+            hf_dir = safe_join(output_base, safe_model_id)
+            if hf_dir.exists() and (
+                (hf_dir / "config.json").exists()
+                or (hf_dir / "model.safetensors").exists()
+                or (hf_dir / "adapter_model.safetensors").exists()
+            ):
+                input_path = hf_dir
+                is_hf_dir = True
+            else:
                 job["status"] = "failed"
                 job["error"] = f"Model {safe_model_id} not found"
                 return
 
         output_path = safe_join(models_dir, f"{safe_model_id}-{method}.gguf")
 
-        # If HF model, convert first
-        if input_path.suffix == ".safetensors":
+        # If HF model directory, convert first
+        if is_hf_dir:
             gguf_path = safe_join(output_base, f"{safe_model_id}-f16.gguf")
             subprocess.run([
                 "python3", "/usr/local/bin/convert_hf_to_gguf.py",
-                str(input_path.parent),
+                str(input_path),
                 "--outtype", "f16",
                 "--outfile", str(gguf_path),
             ], check=True)

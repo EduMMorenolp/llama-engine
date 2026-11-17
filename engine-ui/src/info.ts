@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.0";
+export const APP_VERSION = "0.5.0";
 
 export interface ChangelogEntry {
 	version: string;
@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+	{
+		version: "0.5.0",
+		date: "2026-11-17",
+		title: "Test & Benchmark Suite, Perfiles por Modelo, Playground Studio y Configuración",
+		items: [
+			"Nueva sección Test & Benchmark (/test): evaluación objetiva del modelo cargado con baterías de Velocidad/TTFT, Razonamiento, Código TypeScript, JSON estricto, Stress Test de Contexto, Visión Multimodal y Prompt Personalizado N-runs, con Leaderboard comparativo y exportación a Markdown.",
+			"Sistema de Perfiles / Presets por modelo (models/presets.json): guardado de configuración óptima por GGUF y modos en 1 clic (Eco 8GB VRAM, Máxima Velocidad, Contexto 32K Coding, Multi-Agente).",
+			"Playground Studio mejorado: historial de sesiones persistente, renderizado Markdown con bloques de código copiables, acordeón de pensamiento (<think> / reasoning_content), personas de sistema, pegado de imágenes (Ctrl+V) y guardado directo en DataSets.",
+			"Nueva pantalla de Configuración (/configuracion): personalización de tema (Oscuro/Claro), 4 colores de acento (Emerald, Cyan, Amber, Violet), densidad de UI, barra lateral colapsable, credenciales API y exportación/importación de Workspace.",
+			"Gestión avanzada en Modelos y DataSets: semáforo de compatibilidad VRAM en Hugging Face Hub, eliminación de archivos GGUF locales, creador interactivo de ejemplos en DataSets y curva de Loss en vivo durante el entrenamiento.",
+		],
+	},
 	{
 		version: "0.4.0",
 		date: "2026-11-06",

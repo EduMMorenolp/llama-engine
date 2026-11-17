@@ -9,10 +9,13 @@ import {
 	Tooltip,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
+import { useNavigate } from "react-router-dom";
 import { useRuntime } from "../../hooks/useRuntime";
 import { APP_VERSION } from "../../info";
+import { Button } from "../ui/Button";
 import { Card, Stat, VramBar } from "../ui/Card";
 import { fmtTime, fmtUptime } from "../ui/helpers";
+import { IconDownload, IconGauge } from "../ui/Icons";
 import { PageHeader, PageSection } from "../ui/PageHeader";
 import { ErrorState, Loading } from "../ui/states";
 
@@ -24,10 +27,28 @@ const INFO = "#60a5fa";
 const WARN = "#fbbf24";
 
 export function TelemetryPage() {
+	const navigate = useNavigate();
 	const { status, health, series, error, loading, refresh } = useRuntime();
 
 	if (loading) return <Loading />;
 	if (error && !status) return <ErrorState error={error} onRetry={refresh} />;
+
+	const handleExportCsv = () => {
+		if (series.length === 0) return;
+		const header =
+			"timestamp,time,gen_tok_s,prompt_tok_s,gpu_util_pct,vram_used_mib,temp_c,power_w";
+		const rows = series.map(
+			(p) =>
+				`${p.t},${fmtTime(p.t)},${p.tok.toFixed(2)},${p.promptTok.toFixed(2)},${p.gpuUtil},${p.vramUsedMiB},${p.tempC},${p.powerW.toFixed(1)}`,
+		);
+		const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `telemetria-${status?.loadedModel || "gpu"}-${Date.now()}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
 
 	const gpu = status?.gpu;
 	const slots = status?.slots ?? [];
@@ -93,6 +114,23 @@ export function TelemetryPage() {
 				title="Telemetría"
 				description="Sistema, sensores GPU NVIDIA, slots concurrentes y curvas de throughput de la sesión"
 				badge={`${series.length} muestras`}
+				actions={
+					<div className="action-row">
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={handleExportCsv}
+							disabled={series.length === 0}
+						>
+							<IconDownload size={14} />
+							<span>Exportar CSV</span>
+						</Button>
+						<Button variant="primary" size="sm" onClick={() => navigate("/test")}>
+							<IconGauge size={14} />
+							<span>Ir a Test & Benchmark</span>
+						</Button>
+					</div>
+				}
 			/>
 
 			<div className="grid grid-2">

@@ -2,22 +2,20 @@ import { z } from "zod";
 
 const SAFE_ID_REGEX = /^[a-zA-Z0-9._-]+$/;
 
-export const reloadBodySchema = z.object({
-	modelId: z
-		.string({ required_error: "modelId es requerido" })
-		.trim()
-		.min(1, "modelId es requerido")
-		.regex(SAFE_ID_REGEX, "modelId contiene caracteres inválidos"),
+export const kvCacheTypeSchema = z.enum(["f16", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1"]);
+
+export const reloadOptionsSchema = z.object({
 	ctxSize: z
 		.preprocess(
 			(val) => (val === 0 || val === "" || val === null ? undefined : val),
 			z.coerce.number().int().min(512).max(262_144).optional(),
 		)
 		.optional(),
-	cacheTypeK: z.enum(["f16", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1"]).optional(),
-	cacheTypeV: z.enum(["f16", "q8_0", "q4_0", "q4_1", "q5_0", "q5_1"]).optional(),
+	cacheTypeK: kvCacheTypeSchema.optional(),
+	cacheTypeV: kvCacheTypeSchema.optional(),
 	parallel: z.coerce.number().int().min(1).max(32).optional(),
 	threads: z.coerce.number().int().min(1).max(128).optional(),
+	threadsBatch: z.coerce.number().int().min(1).max(128).optional(),
 	flashAttn: z.enum(["on", "off", "auto"]).optional(),
 	chatTemplate: z
 		.string()
@@ -25,12 +23,44 @@ export const reloadBodySchema = z.object({
 		.max(64)
 		.regex(/^[a-zA-Z0-9._-]*$/, "chatTemplate inválido")
 		.optional(),
-	gpuLayers: z.coerce.number().int().min(0).max(999).optional(),
+	gpuLayers: z.coerce.number().int().min(-1).max(999).optional(),
 	batchSize: z.coerce.number().int().min(32).max(16_384).optional(),
 	ubatchSize: z.coerce.number().int().min(32).max(16_384).optional(),
+	ropeFreqBase: z.coerce.number().positive().max(10_000_000).optional(),
+	ropeFreqScale: z.coerce.number().positive().max(64).optional(),
+	jinja: z.boolean().optional(),
+	reasoningFormat: z.enum(["auto", "deepseek", "none"]).optional(),
+	loraAdapter: z
+		.string()
+		.trim()
+		.max(128)
+		.regex(/^[a-zA-Z0-9._-]*$/, "loraAdapter inválido")
+		.optional(),
 });
 
-export type ReloadOptions = Omit<z.infer<typeof reloadBodySchema>, "modelId">;
+export const reloadBodySchema = reloadOptionsSchema.extend({
+	modelId: z
+		.string({ required_error: "modelId es requerido" })
+		.trim()
+		.min(1, "modelId es requerido")
+		.regex(SAFE_ID_REGEX, "modelId contiene caracteres inválidos"),
+});
+
+export type ReloadOptions = z.infer<typeof reloadOptionsSchema>;
+
+export const modelPresetSchema = reloadOptionsSchema.extend({
+	label: z.string().trim().max(80).optional(),
+	description: z.string().trim().max(240).optional(),
+	systemPrompt: z.string().max(8_192).optional(),
+	temperature: z.coerce.number().min(0).max(2).optional(),
+	topP: z.coerce.number().min(0.05).max(1).optional(),
+	topK: z.coerce.number().int().min(0).max(200).optional(),
+	minP: z.coerce.number().min(0).max(1).optional(),
+	repeatPenalty: z.coerce.number().min(0.5).max(2.5).optional(),
+	maxTokens: z.coerce.number().int().min(32).max(65_536).optional(),
+});
+
+export type ModelPreset = z.infer<typeof modelPresetSchema>;
 
 export const deployBodySchema = z.object({
 	modelName: z
@@ -72,6 +102,7 @@ export const trainStartBodySchema = z.object({
 	rank: z.coerce.number().int().min(4).max(256).default(64),
 	batchSize: z.coerce.number().int().min(1).max(128).default(4),
 	maxSeqLen: z.coerce.number().int().min(128).max(131_072).default(2048),
+	systemPrompt: z.string().max(8_192).optional().default(""),
 });
 
 export const quantizeBodySchema = z.object({
