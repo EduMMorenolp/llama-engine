@@ -65,6 +65,20 @@ export interface OrphanMmproj {
 	sizeBytes: number;
 }
 
+export interface HostSystemInfo {
+	hostname: string;
+	platform: string;
+	arch: string;
+	cpuModel: string;
+	cpuCores: number;
+	cpuUsagePct: number;
+	ramTotalMiB: number;
+	ramUsedMiB: number;
+	ramFreeMiB: number;
+	ramUsagePct: number;
+	uptimeSeconds: number;
+}
+
 export interface EngineStatus {
 	apiUptimeMs: number;
 	runtimeRunning: boolean;
@@ -74,6 +88,7 @@ export interface EngineStatus {
 	models: RegisteredModel[];
 	orphanMmprojs?: OrphanMmproj[];
 	gpu: GpuInfo;
+	system?: HostSystemInfo;
 	slots: SlotInfo[];
 	timestamp: string;
 }

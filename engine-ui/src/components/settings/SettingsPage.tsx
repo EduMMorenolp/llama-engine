@@ -19,7 +19,10 @@ import { APP_VERSION } from "../../info";
 import { Button } from "../ui/Button";
 import {
 	IconCheck,
+	IconCopy,
 	IconDownload,
+	IconEye,
+	IconEyeOff,
 	IconMoon,
 	IconRefresh,
 	IconSave,
@@ -72,8 +75,22 @@ export function SettingsPage() {
 
 	const [apiUrl, setApiUrlState] = useState(() => getApiUrl());
 	const [apiKey, setApiKeyState] = useState(() => getApiKey());
+	const [showApiKey, setShowApiKey] = useState(false);
+	const [copiedApiKey, setCopiedApiKey] = useState(false);
 	const [testingConn, setTestingConn] = useState(false);
 	const [connLatency, setConnLatency] = useState<number | null>(null);
+
+	const handleCopyApiKey = async () => {
+		if (!apiKey) return;
+		try {
+			await navigator.clipboard.writeText(apiKey);
+			setCopiedApiKey(true);
+			toast.success("API Key copiada", "La clave se copió al portapapeles.");
+			setTimeout(() => setCopiedApiKey(false), 2000);
+		} catch {
+			toast.error("Error al copiar", "No se pudo acceder al portapapeles.");
+		}
+	};
 
 	const handleSaveApi = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -297,13 +314,39 @@ export function SettingsPage() {
 
 						<div className="field">
 							<label htmlFor="cfg-api-key">API Key (x-api-key)</label>
-							<input
-								id="cfg-api-key"
-								type="password"
-								value={apiKey}
-								onChange={(e) => setApiKeyState(e.target.value)}
-								placeholder="llama-engine-dev"
-							/>
+							<div className="input-action-group">
+								<input
+									id="cfg-api-key"
+									type={showApiKey ? "text" : "password"}
+									value={apiKey}
+									onChange={(e) => setApiKeyState(e.target.value)}
+									placeholder="llama-engine-dev"
+									autoComplete="off"
+									spellCheck={false}
+								/>
+								<button
+									type="button"
+									className="input-action-btn"
+									onClick={() => setShowApiKey((v) => !v)}
+									title={showApiKey ? "Ocultar API Key" : "Mostrar API Key"}
+									aria-label={showApiKey ? "Ocultar API Key" : "Mostrar API Key"}
+								>
+									{showApiKey ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+								</button>
+								<button
+									type="button"
+									className="input-action-btn"
+									onClick={handleCopyApiKey}
+									title="Copiar API Key al portapapeles"
+									aria-label="Copiar API Key al portapapeles"
+								>
+									{copiedApiKey ? (
+										<IconCheck size={16} className="accent-text" />
+									) : (
+										<IconCopy size={16} />
+									)}
+								</button>
+							</div>
 							<span className="field-hint">
 								Se almacena localmente en tu navegador para autenticar llamadas a /api y /v1.
 							</span>

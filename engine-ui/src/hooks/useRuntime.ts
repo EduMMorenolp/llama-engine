@@ -12,7 +12,7 @@ import type { EngineStatus, RuntimeConfig, RuntimeHealth } from "../api";
 import { fetchRuntimeConfig, fetchRuntimeHealth, fetchStatus, getApiKey, getApiUrl } from "../api";
 
 export const POLL_MS = 3000;
-const MAX_SERIES_POINTS = 120;
+const MAX_SERIES_POINTS = 1200;
 const POLL_STORAGE_KEY = "llama-engine-poll-ms";
 
 export interface TelemetryPoint {
@@ -23,6 +23,9 @@ export interface TelemetryPoint {
 	vramUsedMiB: number;
 	tempC: number;
 	powerW: number;
+	cpuUtil?: number;
+	ramUsedMiB?: number;
+	ramTotalMiB?: number;
 }
 
 export interface RuntimeState {
@@ -52,10 +55,24 @@ function appendTelemetryPoint(prev: TelemetryPoint[], s: EngineStatus): Telemetr
 	const vramUsedMiB = s.gpu.available ? (s.gpu.vramUsedMiB ?? 0) : 0;
 	const tempC = s.gpu.available ? (s.gpu.temperatureC ?? 0) : 0;
 	const powerW = s.gpu.available ? (s.gpu.powerDrawW ?? 0) : 0;
+	const cpuUtil = s.system?.cpuUsagePct ?? 0;
+	const ramUsedMiB = s.system?.ramUsedMiB ?? 0;
+	const ramTotalMiB = s.system?.ramTotalMiB ?? 0;
 
 	const next: TelemetryPoint[] = [
 		...prev,
-		{ t: Date.now(), tok, promptTok, gpuUtil, vramUsedMiB, tempC, powerW },
+		{
+			t: Date.now(),
+			tok,
+			promptTok,
+			gpuUtil,
+			vramUsedMiB,
+			tempC,
+			powerW,
+			cpuUtil,
+			ramUsedMiB,
+			ramTotalMiB,
+		},
 	];
 	return next.length > MAX_SERIES_POINTS ? next.slice(next.length - MAX_SERIES_POINTS) : next;
 }
@@ -106,6 +123,9 @@ function useStandaloneRuntime(skipConfig = false, enabled = true): RuntimeState 
 				vramUsedMiB: last?.vramUsedMiB ?? 0,
 				tempC: last?.tempC ?? 0,
 				powerW: last?.powerW ?? 0,
+				cpuUtil: last?.cpuUtil ?? 0,
+				ramUsedMiB: last?.ramUsedMiB ?? 0,
+				ramTotalMiB: last?.ramTotalMiB ?? 0,
 			};
 			const next = [...prev, nextPoint];
 			return next.length > MAX_SERIES_POINTS ? next.slice(next.length - MAX_SERIES_POINTS) : next;

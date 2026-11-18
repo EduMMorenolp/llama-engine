@@ -14,11 +14,11 @@ export const CHANGELOG: ChangelogEntry[] = [
 		title:
 			"Test & Benchmark Suite, Telemetría WebSocket Live, Perfiles por Modelo, Playground Studio y Configuración",
 		items: [
-			"Telemetría en tiempo real vía WebSocket (/api/ws): canal bidireccional persistente con pulsos de inferencia (tok/s) en vivo desde el proxy /v1, reconexión automática y 0% de uso en background cuando no hay pestañas conectadas.",
+			"Telemetría en tiempo real vía WebSocket (/api/ws) y métricas de Host/PC: canal bidireccional persistente con pulsos de inferencia (tok/s) en vivo, monitoreo de CPU y RAM del sistema, buffer de hasta 1200 muestras y selectores de ventana temporal independientes por gráfico (2m, 5m, 15m, 30m, Todo).",
 			"Nueva sección Test & Benchmark (/test): evaluación objetiva del modelo cargado con baterías de Velocidad/TTFT, Razonamiento, Código TypeScript, JSON estricto, Stress Test de Contexto, Visión Multimodal y Prompt Personalizado N-runs, con Leaderboard comparativo y exportación a Markdown.",
 			"Sistema de Perfiles / Presets por modelo (models/presets.json): guardado de configuración óptima por GGUF y modos en 1 clic (Eco 8GB VRAM, Máxima Velocidad, Contexto 32K Coding, Multi-Agente).",
 			"Playground Studio mejorado: historial de sesiones persistente, renderizado Markdown con bloques de código copiables, acordeón de pensamiento (<think> / reasoning_content), personas de sistema, pegado de imágenes (Ctrl+V) y guardado directo en DataSets.",
-			"Nueva pantalla de Configuración (/configuracion): personalización de tema (Oscuro/Claro), 4 colores de acento (Emerald, Cyan, Amber, Violet), densidad de UI, barra lateral colapsable, credenciales API y exportación/importación de Workspace.",
+			"Nueva pantalla de Configuración (/configuracion): personalización de tema (Oscuro/Claro), 4 colores de acento (Emerald, Cyan, Amber, Violet), densidad de UI, barra lateral colapsable, credenciales API con alternancia de visibilidad (ojo) y botón para copiar clave al portapapeles, y exportación/importación de Workspace.",
 			"Gestión avanzada en Modelos y DataSets: semáforo de compatibilidad VRAM en Hugging Face Hub, eliminación de archivos GGUF locales, creador interactivo de ejemplos en DataSets y curva de Loss en vivo durante el entrenamiento.",
 		],
 	},
@@ -132,7 +132,7 @@ export const MANUAL: ManualSection[] = [
 			{
 				heading: "Configuración (/configuracion)",
 				body: [
-					"Personalización visual (Modo Oscuro Obsidian / Claro Paper, 4 colores de acento, densidad confortable/compacta, barra lateral colapsable), configuración de URL/API Key y respaldo/restauración completa del Workspace (.json).",
+					"Personalización visual (Modo Oscuro Obsidian / Claro Paper, 4 colores de acento, densidad confortable/compacta, barra lateral colapsable), configuración de URL/API Key con visualizador seguro (ojo) y botón de copiado rápido, y respaldo/restauración completa del Workspace (.json).",
 				],
 			},
 			{

@@ -30,11 +30,46 @@
 			"group": "build"
 		},
 		{
-			"label": "compose: up",
+			"label": "compose: up (api + ui fast)",
+			"type": "shell",
+			"command": "docker compose up -d --build --no-deps engine-api engine-ui-telemetry",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra", "reveal": "always" }
+		},
+		{
+			"label": "compose: up (ui only)",
+			"type": "shell",
+			"command": "docker compose up -d --build --no-deps engine-ui-telemetry",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra", "reveal": "always" }
+		},
+		{
+			"label": "compose: up (api only)",
+			"type": "shell",
+			"command": "docker compose up -d --build --no-deps engine-api",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra", "reveal": "always" }
+		},
+		{
+			"label": "compose: up (all services)",
 			"type": "shell",
 			"command": "docker compose up -d --build",
 			"options": { "cwd": "${workspaceFolder}" },
 			"presentation": { "group": "infra" }
+		},
+		{
+			"label": "compose: ps",
+			"type": "shell",
+			"command": "docker compose ps",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra", "reveal": "always" }
+		},
+		{
+			"label": "compose: logs (runtime)",
+			"type": "shell",
+			"command": "docker compose logs -f llama-runtime",
+			"options": { "cwd": "${workspaceFolder}" },
+			"presentation": { "group": "infra", "reveal": "always" }
 		},
 		{
 			"label": "compose: down",

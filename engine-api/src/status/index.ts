@@ -1,6 +1,21 @@
+import os from "node:os";
 import type { AppConfig } from "../config.js";
 import type { ModelRegistry, OrphanMmproj, RegisteredModel } from "../models/registry.js";
 import type { RuntimeManager } from "../runtime/manager.js";
+
+export interface HostSystemInfo {
+	hostname: string;
+	platform: string;
+	arch: string;
+	cpuModel: string;
+	cpuCores: number;
+	cpuUsagePct: number;
+	ramTotalMiB: number;
+	ramUsedMiB: number;
+	ramFreeMiB: number;
+	ramUsagePct: number;
+	uptimeSeconds: number;
+}
 
 export interface GpuInfo {
 	available: boolean;
@@ -33,6 +48,7 @@ export interface EngineStatus {
 	models: RegisteredModel[];
 	orphanMmprojs?: OrphanMmproj[];
 	gpu: GpuInfo;
+	system: HostSystemInfo;
 	slots: SlotInfo[];
 	timestamp: string;
 }
@@ -58,6 +74,7 @@ export class StatusService {
 	private gpuCache: { at: number; info: GpuInfo } | null = null;
 	private lastPulse: InferencePulse | null = null;
 	private readonly pulseListeners = new Set<(pulse: InferencePulse) => void>();
+	private prevCpuTimes: { idle: number; total: number } | null = null;
 
 	constructor(
 		private readonly config: AppConfig,
@@ -310,6 +327,46 @@ export class StatusService {
 		return props.ctxSize;
 	}
 
+	getHostSystem(): HostSystemInfo {
+		const cpus = os.cpus();
+		let idle = 0;
+		let total = 0;
+		for (const cpu of cpus) {
+			for (const type in cpu.times) {
+				total += (cpu.times as Record<string, number>)[type];
+			}
+			idle += cpu.times.idle;
+		}
+
+		let cpuUsagePct = 0;
+		if (this.prevCpuTimes) {
+			const deltaIdle = idle - this.prevCpuTimes.idle;
+			const deltaTotal = total - this.prevCpuTimes.total;
+			if (deltaTotal > 0) {
+				cpuUsagePct = Math.max(0, Math.min(100, Math.round((1 - deltaIdle / deltaTotal) * 100)));
+			}
+		}
+		this.prevCpuTimes = { idle, total };
+
+		const totalBytes = os.totalmem();
+		const freeBytes = os.freemem();
+		const usedBytes = Math.max(0, totalBytes - freeBytes);
+
+		return {
+			hostname: os.hostname(),
+			platform: os.platform(),
+			arch: os.arch(),
+			cpuModel: cpus[0]?.model ? cpus[0].model.trim() : "Generic CPU",
+			cpuCores: cpus.length,
+			cpuUsagePct,
+			ramTotalMiB: Math.round(totalBytes / (1024 * 1024)),
+			ramUsedMiB: Math.round(usedBytes / (1024 * 1024)),
+			ramFreeMiB: Math.round(freeBytes / (1024 * 1024)),
+			ramUsagePct: totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0,
+			uptimeSeconds: Math.round(os.uptime()),
+		};
+	}
+
 	async status(): Promise<EngineStatus> {
 		const [running, healthy, gpu, props] = await Promise.all([
 			this.runtime.isRunning(),
@@ -327,6 +384,7 @@ export class StatusService {
 			models: this.registry.list(),
 			orphanMmprojs: this.registry.listOrphanMmprojs(),
 			gpu,
+			system: this.getHostSystem(),
 			slots,
 			timestamp: new Date().toISOString(),
 		};

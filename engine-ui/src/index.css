@@ -174,7 +174,6 @@ a:hover {
 	display: flex;
 	flex-direction: column;
 	width: 100%;
-	max-width: 1240px;
 	margin: 0 auto;
 	padding: 0 28px;
 }
@@ -739,6 +738,10 @@ a:hover {
 
 .grid-2 {
 	grid-template-columns: 1fr 1fr;
+}
+
+.grid-3 {
+	grid-template-columns: repeat(3, 1fr);
 }
 
 .card {
@@ -3212,6 +3215,45 @@ textarea:focus {
 	gap: 16px;
 }
 
+.settings-stack .field input {
+	width: 100%;
+	max-width: 440px;
+}
+
+.input-action-group {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	max-width: 440px;
+}
+
+.input-action-group input {
+	flex: 1;
+	min-width: 0;
+	width: 100%;
+}
+
+.input-action-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 9px;
+	border-radius: var(--r-sm);
+	border: 1px solid var(--border);
+	background: var(--bg2);
+	color: var(--muted);
+	cursor: pointer;
+	transition: all 0.15s ease;
+	flex-shrink: 0;
+}
+
+.input-action-btn:hover {
+	color: var(--text);
+	border-color: var(--accent);
+	background: rgba(255, 255, 255, 0.04);
+}
+
 .field-label {
 	font-size: var(--fs-label);
 	font-weight: 600;
@@ -3280,11 +3322,26 @@ textarea:focus {
 	flex-shrink: 0;
 }
 
-.accent-swatch-info {
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	min-width: 0;
+.chart-range-select {
+	padding: 5px 10px;
+	border-radius: var(--r-sm);
+	border: 1px solid var(--border);
+	background: var(--bg2);
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+.chart-range-select:hover {
+	border-color: var(--accent);
+}
+
+.chart-range-select:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
 }
 
 @media (max-width: 960px) {
@@ -3296,8 +3353,15 @@ textarea:focus {
 /* ---------------------------------------------------------------------------
  * Responsive & Reduced Motion
  * --------------------------------------------------------------------------- */
+@media (max-width: 1080px) {
+	.grid-3 {
+		grid-template-columns: 1fr;
+	}
+}
+
 @media (max-width: 960px) {
 	.grid-2,
+	.grid-3,
 	.help-grid {
 		grid-template-columns: 1fr;
 	}

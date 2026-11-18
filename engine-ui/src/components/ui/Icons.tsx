@@ -417,3 +417,22 @@ export function IconSave(props: IconProps) {
 		</Svg>
 	);
 }
+
+export function IconClock(props: IconProps) {
+	return (
+		<Svg {...props}>
+			<circle cx="12" cy="12" r="10" />
+			<polyline points="12 6 12 12 16 14" />
+		</Svg>
+	);
+}
+
+export function IconHistory(props: IconProps) {
+	return (
+		<Svg {...props}>
+			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+			<path d="M3 3v5h5" />
+			<polyline points="12 7 12 12 15 15" />
+		</Svg>
+	);
+}
