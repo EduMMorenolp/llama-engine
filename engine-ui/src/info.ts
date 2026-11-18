@@ -14,6 +14,7 @@ export const CHANGELOG: ChangelogEntry[] = [
 		title:
 			"Test & Benchmark Suite, Telemetría WebSocket Live, Perfiles por Modelo, Playground Studio y Configuración",
 		items: [
+			"Iconos explicativos (i) y Tour Interactivo de Bienvenida: tooltips con impacto en memoria y recomendaciones en parámetros clave de Modelos, y guía de bienvenida en 6 pasos accesible en la primera visita o en cualquier momento desde Ayuda & API.",
 			"Telemetría en tiempo real vía WebSocket (/api/ws) y métricas de Host/PC: canal bidireccional persistente con pulsos de inferencia (tok/s) en vivo, monitoreo de CPU y RAM del sistema, buffer de hasta 1200 muestras y selectores de ventana temporal independientes por gráfico (2m, 5m, 15m, 30m, Todo).",
 			"Nueva sección Test & Benchmark (/test): evaluación objetiva del modelo cargado con baterías de Velocidad/TTFT, Razonamiento, Código TypeScript, JSON estricto, Stress Test de Contexto, Visión Multimodal y Prompt Personalizado N-runs, con Leaderboard comparativo y exportación a Markdown.",
 			"Sistema de Perfiles / Presets por modelo (models/presets.json): guardado de configuración óptima por GGUF y modos en 1 clic (Eco 8GB VRAM, Máxima Velocidad, Contexto 32K Coding, Multi-Agente).",

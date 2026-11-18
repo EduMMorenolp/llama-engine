@@ -3,8 +3,9 @@ import { getApiKey, getApiUrl } from "../../api";
 import { useToast } from "../../context/ToastContext";
 import { useRuntime } from "../../hooks/useRuntime";
 import { CHANGELOG, MANUAL } from "../../info";
+import { openOnboardingTour } from "../onboarding/OnboardingModal";
 import { Button } from "../ui/Button";
-import { IconCopy, IconSearch } from "../ui/Icons";
+import { IconCopy, IconSearch, IconSparkles } from "../ui/Icons";
 import { PageHeader, PageSection } from "../ui/PageHeader";
 
 type SnippetKey = "curl" | "python" | "typescript" | "websocket" | "opencode" | "hermes";
@@ -151,7 +152,43 @@ model_aliases:
 			<PageHeader
 				title="Ayuda & Integración API"
 				description="Snippets listos para usar, atajos de teclado, manual de operación y changelog"
+				actions={
+					<Button variant="primary" size="sm" onClick={openOnboardingTour}>
+						<IconSparkles size={14} />
+						<span>Guía de Uso (Tour Interactivo)</span>
+					</Button>
+				}
 			/>
+
+			<div
+				className="card"
+				style={{
+					padding: "16px 20px",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					flexWrap: "wrap",
+					gap: "12px",
+					background: "rgba(52, 211, 153, 0.05)",
+					borderColor: "rgba(52, 211, 153, 0.25)",
+				}}
+			>
+				<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+					<IconSparkles size={22} className="accent-text" />
+					<div>
+						<strong style={{ display: "block", fontSize: "14px" }}>
+							Tour y Guía de Uso del Sistema
+						</strong>
+						<span className="muted small">
+							Repasá el paso a paso de todas las pantallas, modelos GGUF, benchmarks y telemetría en
+							cualquier momento.
+						</span>
+					</div>
+				</div>
+				<Button variant="primary" size="sm" onClick={openOnboardingTour}>
+					<span>Iniciar Tour</span>
+				</Button>
+			</div>
 
 			<PageSection
 				title="Integración Rápida OpenAI-Compatible (/v1) & Telemetría WebSocket (/api/ws)"

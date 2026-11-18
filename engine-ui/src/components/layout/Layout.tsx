@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { RuntimeProvider, useRuntime } from "../../hooks/useRuntime";
+import { ONBOARDING_STORAGE_KEY, OnboardingModal } from "../onboarding/OnboardingModal";
 import { CommandPalette } from "../ui/CommandPalette";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { fmtTime } from "../ui/helpers";
@@ -11,8 +12,21 @@ import { Topbar } from "./Topbar";
 function LayoutInner() {
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [paletteOpen, setPaletteOpen] = useState(false);
+	const [showTour, setShowTour] = useState(() => {
+		try {
+			return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) !== "true";
+		} catch {
+			return false;
+		}
+	});
 	const { status, health, error, loading, refresh, pollMs, paused, lastUpdated, wsConnected } =
 		useRuntime();
+
+	useEffect(() => {
+		const handleOpenTour = () => setShowTour(true);
+		window.addEventListener("llama-engine-open-tour", handleOpenTour);
+		return () => window.removeEventListener("llama-engine-open-tour", handleOpenTour);
+	}, []);
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -76,6 +90,7 @@ function LayoutInner() {
 				</footer>
 			</div>
 			<CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+			<OnboardingModal isOpen={showTour} onClose={() => setShowTour(false)} />
 		</div>
 	);
 }
